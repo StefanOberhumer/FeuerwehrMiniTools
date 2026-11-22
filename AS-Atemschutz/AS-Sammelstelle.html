@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AS-Sammelstelle</title>
+<style>
+:root {
+  --bg: #f2f3f5;
+  --surface: #ffffff;
+  --surface-2: #e8eaee;
+  --text: #15181d;
+  --muted: #5c6470;
+  --border: #c9ced6;
+  --primary: #c8102e;      /* Feuerwehr-Rot */
+  --primary-text: #ffffff;
+  --wait: #1f5fbf;
+  --wait-bg: #e3ecfa;
+  --active: #c25e00;
+  --active-bg: #fdebd6;
+  --done: #1d7a3a;
+  --done-bg: #ddf2e3;
+  --alarm: #b00020;
+  --alarm-bg: #ffd9de;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111317;
+    --surface: #1b1e24;
+    --surface-2: #262a32;
+    --text: #eef0f3;
+    --muted: #9aa3af;
+    --border: #3a404a;
+    --primary: #e0334f;
+    --wait: #7eaaf0;
+    --wait-bg: #1c2a42;
+    --active: #ffab5c;
+    --active-bg: #3d2a14;
+    --done: #6fd18f;
+    --done-bg: #173322;
+    --alarm: #ff6b7f;
+    --alarm-bg: #4a1720;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* ---------- Kopfzeile ---------- */
+header {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--primary); color: var(--primary-text);
+}
+header h1 { font-size: 1.25rem; margin: 0; white-space: nowrap; }
+header .einsatz-info { flex: 1; min-width: 0; font-size: .95rem; opacity: .95; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header .clock { font-variant-numeric: tabular-nums; font-size: 1.4rem; font-weight: 700; }
+header .hbtn {
+  min-height: 44px; padding: 0 14px; border-radius: var(--radius);
+  border: 2px solid rgba(255,255,255,.7); background: transparent; color: #fff; font-weight: 600; cursor: pointer;
+}
+header .hbtn:active { background: rgba(255,255,255,.2); }
+
+main { padding: 16px; max-width: 1600px; margin: 0 auto; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 48px; padding: 0 18px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font-weight: 600; cursor: pointer; user-select: none;
+}
+.btn:active { transform: scale(.97); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+.btn.wait    { background: var(--wait);   border-color: var(--wait);   color: #fff; }
+.btn.go      { background: var(--active); border-color: var(--active); color: #fff; }
+.btn.back    { background: var(--done);   border-color: var(--done);   color: #fff; }
+.btn.danger  { color: var(--alarm); border-color: var(--alarm); background: transparent; }
+.btn.small   { min-height: 40px; padding: 0 12px; font-size: .9rem; }
+.btn.big     { min-height: 60px; font-size: 1.15rem; padding: 0 26px; }
+@media (prefers-color-scheme: dark) { .btn.go, .btn.back, .btn.wait { color: #111; } }
+
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.toolbar .spacer { flex: 1; }
+
+/* ---------- Kennzahlen ---------- */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 16px; border-left: 6px solid var(--border);
+}
+.stat .val { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat .lbl { color: var(--muted); font-size: .9rem; }
+.stat.wait   { border-left-color: var(--wait); }
+.stat.active { border-left-color: var(--active); }
+.stat.done   { border-left-color: var(--done); }
+
+/* ---------- Filter ---------- */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; font-weight: 600;
+}
+.chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+/* ---------- Tabelle ---------- */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+th, td { padding: 10px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { background: var(--surface-2); font-size: .82rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); position: sticky; top: 0; }
+th.grp { text-align: center; border-left: 2px solid var(--border); }
+td.time, th.time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.sep, th.sep { border-left: 2px solid var(--border); }
+tbody tr { cursor: pointer; }
+tbody tr:active { background: var(--surface-2); }
+tr.s-wartend td:first-child { box-shadow: inset 6px 0 0 var(--wait); }
+tr.s-einsatz td:first-child { box-shadow: inset 6px 0 0 var(--active); }
+tr.s-zurueck td:first-child { box-shadow: inset 6px 0 0 var(--done); }
+tr.s-zurueck { color: var(--muted); }
+.nr { font-weight: 800; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.trupp-name { font-weight: 700; }
+.personen { font-size: .95rem; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .85rem; font-weight: 700; white-space: nowrap; }
+.badge.wartend { background: var(--wait-bg); color: var(--wait); }
+.badge.einsatz { background: var(--active-bg); color: var(--active); }
+.badge.zurueck { background: var(--done-bg); color: var(--done); }
+.dur { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.dur.warn  { color: var(--active); }
+.dur.alarm { color: #fff; background: var(--alarm); padding: 3px 10px; border-radius: 6px; animation: blink 1.2s steps(2) infinite; }
+@media (prefers-color-scheme: dark) { .dur.alarm { color: #111; } }
+/* Einsatzdauer überschritten: ganze Zeile rot hinterlegen */
+tr.over, tr.over:active { background: var(--alarm-bg); }
+tr.over td { border-bottom-color: var(--alarm); }
+tr.over td:first-child { box-shadow: inset 8px 0 0 var(--alarm); }
+.badge.over { background: var(--alarm); color: #fff; margin-top: 4px; }
+@media (prefers-color-scheme: dark) { .badge.over { color: #111; } }
+.display li.over { background: var(--alarm-bg); box-shadow: inset 8px 0 0 var(--alarm); }
+.display li.over .t { color: var(--alarm); }
+@keyframes blink { 50% { opacity: .55; } }
+.sub { color: var(--muted); font-size: .85rem; }
+.empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+
+/* ---------- Einsatzliste ---------- */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.card.current { border: 2px solid var(--primary); }
+.card h3 { margin: 0; font-size: 1.15rem; }
+.card .meta { color: var(--muted); font-size: .92rem; }
+.card .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+
+/* ---------- Dialoge ---------- */
+dialog {
+  border: none; border-radius: 14px; padding: 0; width: min(640px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px); background: var(--surface); color: var(--text);
+  box-shadow: 0 20px 60px rgba(0,0,0,.4);
+}
+dialog::backdrop { background: rgba(0,0,0,.5); }
+dialog form { display: flex; flex-direction: column; max-height: calc(100vh - 24px); }
+dialog .dhead { padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 1.2rem; font-weight: 700; }
+dialog .dbody { padding: 16px 20px; overflow-y: auto; display: grid; gap: 14px; }
+dialog .dfoot { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; flex-wrap: wrap; }
+dialog .dfoot .spacer { flex: 1; }
+fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 0; display: grid; gap: 12px; }
+legend { font-weight: 700; padding: 0 6px; color: var(--muted); font-size: .9rem; text-transform: uppercase; letter-spacing: .03em; }
+label { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); font-weight: 600; }
+input, select, textarea {
+  min-height: 48px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font-size: 1.05rem; width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: 3px solid var(--wait); outline-offset: 1px; }
+textarea { min-height: 70px; resize: vertical; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.time-row { display: flex; gap: 8px; align-items: end; }
+.time-row label { flex: 1; }
+.person-row { display: grid; grid-template-columns: 1.3fr 1fr 48px; gap: 8px; align-items: center; }
+.person-row .rm { min-height: 48px; width: 48px; padding: 0; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--alarm); font-size: 1.4rem; cursor: pointer; }
+@media (max-width: 520px) { .person-row { grid-template-columns: 1fr 48px; } .person-row .fw { grid-column: 1; } }
+
+/* ---------- Übersicht ---------- */
+.display { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 900px) { .display { grid-template-columns: 1fr; } }
+.display section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.display h2 { margin: 0; padding: 14px 20px; font-size: 1.6rem; color: #fff; }
+.display .h-wait { background: var(--wait); }
+.display .h-active { background: var(--active); }
+@media (prefers-color-scheme: dark) { .display h2 { color: #111; } }
+.display ol { list-style: none; margin: 0; padding: 0; }
+.display li { display: flex; gap: 16px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 1.35rem; }
+.display li .pos { font-size: 2.2rem; font-weight: 800; min-width: 2.2em; text-align: center; font-variant-numeric: tabular-nums; }
+.display li .main { flex: 1; min-width: 0; }
+.display li .main .t { font-weight: 800; }
+.display li .main .p { font-size: 1.05rem; color: var(--muted); }
+.display li .right { text-align: right; font-size: 1.1rem; }
+.display li.next { background: var(--wait-bg); }
+.display .empty { font-size: 1.3rem; }
+.display li .disp-act { flex: none; font-size: 1rem; }
+.display li[data-action] { cursor: pointer; }
+.display li[data-action]:active { background: var(--surface-2); }
+.is-closed-disp .display li[data-action] { cursor: default; }
+.is-closed-disp .display li[data-action]:active { background: inherit; }
+@media (max-width: 600px) { .display li { flex-wrap: wrap; } .display li .disp-act { width: 100%; } }
+.display-head { display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
+.display-head .big-clock { font-size: 3rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.display-head .title { font-size: 1.6rem; font-weight: 700; flex: 1; }
+.display-head #dispNewTrupp { align-self: center; }
+
+.card.closed { opacity: .8; }
+.card .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700; vertical-align: middle; margin-left: 6px; }
+.tag.open   { background: var(--active-bg); color: var(--active); }
+.tag.closed { background: var(--surface-2); color: var(--muted); }
+.export-info.stale { color: var(--alarm); font-weight: 600; }
+.list-head { margin: 22px 0 10px; font-size: .9rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.list-head:first-child { margin-top: 0; }
+.closed-banner { background: var(--surface-2); border: 1px solid var(--border); border-left: 6px solid var(--muted); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; font-weight: 600; }
+.is-closed .edit-only, .is-closed td.act, .is-closed th.act { display: none !important; }
+.is-closed tbody tr { cursor: default; }
+.storage-zone { margin-top: 32px; padding: 16px; border: 1px dashed var(--alarm); border-radius: var(--radius); display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.warnbox { background: var(--alarm-bg); color: var(--alarm); padding: 10px 14px; border-radius: 8px; font-weight: 600; }
+
+footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 12px 16px 20px; }
+footer .linkbtn { background: none; border: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; min-height: 44px; padding: 0 4px; }
+
+.req { color: var(--primary); font-weight: 800; }
+.field-title { font-size: .9rem; color: var(--muted); font-weight: 600; }
+.req-note { font-size: .85rem; color: var(--muted); align-self: center; }
+
+.notes { display: grid; gap: 8px; }
+.notes-log { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 8px; max-height: 180px; overflow-y: auto; }
+.notes-log li { padding: 4px 12px; display: flex; gap: 12px; }
+.notes-log li:first-child { padding-top: 8px; }
+.notes-log li:last-child { padding-bottom: 8px; }
+.notes-log .at { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: .9rem; }
+.notes-old { display: grid; gap: 6px; }
+.note-line .at { font-variant-numeric: tabular-nums; margin-right: 6px; }
+
+.suggest {
+  position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+.suggest li { padding: 12px 14px; min-height: 44px; cursor: pointer; }
+.suggest li + li { border-top: 1px solid var(--surface-2); }
+.suggest li.active, .suggest li:hover { background: var(--wait-bg); }
+
+input.readonly { background: var(--surface-2); color: var(--muted); border-style: dashed; pointer-events: none; }
+.hidden { display: none !important; }
+
+/* ---------- Toast ---------- */
+#toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(150%);
+  background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: var(--radius);
+  font-weight: 600; transition: transform .25s; z-index: 100; max-width: calc(100vw - 32px);
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ---------- Druck ---------- */
+@media print {
+  header .hbtn, .toolbar, .chips, .no-print, td.act, th.act, .disp-act { display: none !important; }
+  header { position: static; background: none; color: #000; border-bottom: 2px solid #000; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .table-wrap { border: none; overflow: visible; }
+  table { min-width: 0; }
+  th { position: static; }
+  .dur.alarm { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧯 AS-Sammelstelle</h1>
+  <div class="einsatz-info" id="hdrInfo">Kein Einsatz gewählt</div>
+  <div class="clock" id="clock">--:--</div>
+  <button class="hbtn" data-action="view-list">Einsätze</button>
+  <button class="hbtn" data-action="view-einsatz" id="btnViewEinsatz">Tabelle</button>
+  <button class="hbtn" data-action="view-display" id="btnViewDisplay">Übersicht</button>
+</header>
+
+<main>
+  <!-- ===== Einsatzliste ===== -->
+  <div id="viewList" class="hidden">
+    <div class="toolbar">
+      <button class="btn primary big" data-action="new-einsatz">＋ Neuer Einsatz</button>
+      <span class="spacer"></span>
+      <button class="btn" data-action="import">⤓ Importieren</button>
+      <button class="btn" data-action="export-all">⤒ Alle exportieren</button>
+    </div>
+    <div id="einsatzCards"></div>
+    <div class="storage-zone">
+      <div>
+        <b>Lokalen Speicher leeren</b>
+        <div class="sub">Löscht alle Einsätze dieser Seite aus dem LocalStorage dieses Browsers.</div>
+      </div>
+      <button class="btn danger" data-action="clear-storage">🗑 Speicher leeren</button>
+    </div>
+  </div>
+
+  <!-- ===== Einsatz / Trupp-Tabelle ===== -->
+  <div id="viewEinsatz" class="hidden">
+    <div class="closed-banner hidden" id="closedBanner"></div>
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <button class="btn primary big edit-only" data-action="new-trupp">＋ Neuer Trupp</button>
+      <div class="chips" id="filterChips">
+        <button class="chip" data-filter="alle" aria-pressed="true">Alle</button>
+        <button class="chip" data-filter="wartend" aria-pressed="false">Wartend</button>
+        <button class="chip" data-filter="einsatz" aria-pressed="false">Im Einsatz</button>
+        <button class="chip" data-filter="zurueck" aria-pressed="false">Zurück</button>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn small edit-only" data-action="edit-einsatz">✎ Einsatzdaten</button>
+      <button class="btn small edit-only" data-action="close-einsatz">🔒 Einsatz abschließen</button>
+      <button class="btn small" data-action="export-current">⤒ Export</button>
+      <button class="btn small" data-action="print">🖶 Drucken</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th colspan="5">Allgemein</th>
+            <th class="grp" colspan="1">Status</th>
+            <th class="grp" colspan="4">Einsatz</th>
+            <th class="grp" colspan="1">Ende</th>
+            <th class="act"></th>
+          </tr>
+          <tr>
+            <th>Nr.</th>
+            <th>Trupp</th>
+            <th>Personen</th>
+            <th>Feuerwehr</th>
+            <th class="time">Anmeldung</th>
+            <th class="sep">Status</th>
+            <th class="sep time">Abmarsch</th>
+            <th>Abschnitt</th>
+            <th>Funk</th>
+            <th class="time">Dauer</th>
+            <th class="sep time">Rückmeldung</th>
+            <th class="act"></th>
+          </tr>
+        </thead>
+        <tbody id="truppBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== Übersicht für Wartende / Leitung ===== -->
+  <div id="viewDisplay" class="hidden">
+    <div class="display-head">
+      <div class="title" id="dispTitle"></div>
+      <button class="btn primary small no-print" data-action="new-trupp" id="dispNewTrupp">＋ Neuer Trupp</button>
+      <div class="big-clock" id="dispClock">--:--</div>
+    </div>
+    <div class="stats" id="dispStats"></div>
+    <div class="display">
+      <section>
+        <h2 class="h-wait">Warteschlange</h2>
+        <ol id="dispWait"></ol>
+      </section>
+      <section>
+        <h2 class="h-active">Im Einsatz</h2>
+        <ol id="dispActive"></ol>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer>V 1.04 | &copy; FF Haselbach[BR-AT]/Stefan Oberhumer (stefan@obssys.com) | <button type="button" class="linkbtn" data-action="haftung">Haftungsausschluss</button></footer>
+
+<!-- ===== Dialog: Einsatz ===== -->
+<dialog id="dlgEinsatz">
+  <form method="dialog" id="formEinsatz">
+    <div class="dhead" id="dlgEinsatzTitle">Neuer Einsatz</div>
+    <div class="dbody">
+      <label>Einsatz-Bezeichnung <span class="req" aria-hidden="true">*</span>
+        <input name="bezeichnung" required placeholder="z. B. Brand Lagerhalle Industriestraße 123" autocomplete="off">
+      </label>
+      <div class="row">
+        <label><span>Datum <span class="req" aria-hidden="true">*</span></span><input type="date" name="datum" required></label>
+        <label><span>Beginn <span class="req" aria-hidden="true">*</span></span><input type="time" name="beginn" required></label>
+      </div>
+      <label>Warnung bei Einsatzdauer ab (Minuten)
+        <input type="number" name="warnMin" min="1" max="240" step="1" inputmode="numeric">
+      </label>
+    </div>
+    <div class="dfoot">
+      <span class="req-note"><span class="req">*</span> Pflichtfeld</span>
+      <button type="button" class="btn danger hidden" data-action="delete-einsatz" id="btnDelEinsatz">Löschen</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <button type="submit" class="btn primary">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Trupp ===== -->
+<dialog id="dlgTrupp">
+  <form method="dialog" id="formTrupp">
+    <div class="dhead" id="dlgTruppTitle">Neuer Trupp</div>
+    <div class="dbody">
+      <fieldset>
+        <legend>Allgemein</legend>
+        <div class="row">
+          <label><span>Truppname <span class="req" aria-hidden="true">*</span></span><input name="name" required placeholder="z. B. Trupp 1" autocomplete="off"></label>
+          <label>Nummer <input type="text" name="nr" readonly tabindex="-1" class="readonly"></label>
+        </div>
+        <div class="field-title">Personen <span class="req" aria-hidden="true">*</span> <span class="sub">(mindestens ein Name)</span></div>
+        <div id="personList" style="display:grid; gap:8px"></div>
+        <button type="button" class="btn small" data-action="add-person">＋ Person hinzufügen</button>
+        <div class="time-row">
+          <label><span>Uhrzeit Anmeldung <span class="req" aria-hidden="true">*</span></span><input type="time" name="anmeldung" required></label>
+          <button type="button" class="btn" data-now="anmeldung">Jetzt</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Einsatz</legend>
+        <div class="time-row">
+          <label>Abmarschzeit <input type="time" name="abmarsch"></label>
+          <button type="button" class="btn" data-now="abmarsch">Jetzt</button>
+        </div>
+        <div class="row">
+          <label>Einsatz-Abschnitt <input name="abschnitt" data-suggest="ab" autocomplete="off" placeholder="z.B. Haupteingang"></label>
+          <label>Funkverbindung <input name="funk" data-suggest="fu" autocomplete="off" placeholder="z. B. Rufname/Kanal 7"></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Einsatzende</legend>
+        <div class="time-row">
+          <label>Uhrzeit Rückmeldung <input type="time" name="rueckmeldung"></label>
+          <button type="button" class="btn" data-now="rueckmeldung">Jetzt</button>
+        </div>
+      </fieldset>
+      <div class="notes">
+        <label>Neue Notiz <textarea name="notiz" rows="2"></textarea></label>
+        <div class="notes-old">
+          <div class="field-title">Notizen</div>
+          <ul class="notes-log"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="dfoot">
+      <span class="req-note"><span class="req">*</span> Pflichtfeld</span>
+      <button type="button" class="btn danger hidden" data-action="delete-trupp" id="btnDelTrupp">Löschen</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <button type="submit" class="btn primary">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Abmarsch ===== -->
+<dialog id="dlgAbmarsch">
+  <form method="dialog" id="formAbmarsch">
+    <div class="dhead" id="dlgAbmarschTitle">Abmarsch</div>
+    <div class="dbody">
+      <div class="time-row">
+        <label><span>Abmarschzeit <span class="req" aria-hidden="true">*</span></span><input type="time" name="abmarsch" required></label>
+        <button type="button" class="btn" data-now="abmarsch">Jetzt</button>
+      </div>
+      <label><span>Einsatz-Abschnitt</span><input name="abschnitt" data-suggest="ab" autocomplete="off" placeholder="z.B. Haupteingang"></label>
+      <label>Funkverbindung <input name="funk" data-suggest="fu" autocomplete="off" placeholder="z.B. Rufname/Kanal 7"></label>
+      <div class="notes">
+        <label>Neue Notiz <textarea name="notiz" rows="2"></textarea></label>
+        <div class="notes-old">
+          <div class="field-title">Notizen</div>
+          <ul class="notes-log"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="dfoot">
+      <span class="req-note"><span class="req">*</span> Pflichtfeld</span>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <button type="submit" class="btn go">Abmarsch bestätigen</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Rückmeldung ===== -->
+<dialog id="dlgRueck">
+  <form method="dialog" id="formRueck">
+    <div class="dhead" id="dlgRueckTitle">Rückmeldung</div>
+    <div class="dbody">
+      <div class="time-row">
+        <label><span>Uhrzeit Rückmeldung <span class="req" aria-hidden="true">*</span></span><input type="time" name="rueckmeldung" required></label>
+        <button type="button" class="btn" data-now="rueckmeldung">Jetzt</button>
+      </div>
+      <div class="notes">
+        <label>Neue Notiz <textarea name="notiz" rows="2"></textarea></label>
+        <div class="notes-old">
+          <div class="field-title">Notizen</div>
+          <ul class="notes-log"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="dfoot">
+      <span class="req-note"><span class="req">*</span> Pflichtfeld</span>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <button type="submit" class="btn back">Rückmeldung bestätigen</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Löschen mit Export-Nachfrage ===== -->
+<dialog id="dlgDelete">
+  <form method="dialog">
+    <div class="dhead" id="dlgDeleteTitle">Löschen</div>
+    <div class="dbody" id="dlgDeleteText"></div>
+    <div class="dfoot">
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn danger" id="btnDelNoExport">Ohne Export löschen</button>
+      <button type="button" class="btn primary" id="btnDelExport">Exportieren &amp; löschen</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Haftungsausschluss ===== -->
+<dialog id="dlgHaftung">
+  <form method="dialog">
+    <div class="dhead">Haftungsausschluss</div>
+    <div class="dbody">
+      <p>Diese Werkzeuge sind <strong>Hilfsmittel</strong> und ersetzen weder die Atemschutzüberwachung nach den geltenden Vorschriften und Dienstanweisungen noch die Verantwortung der Einsatzkräfte. Alle Berechnungen sind Schätzungen auf Basis angenommener Verbrauchswerte. Der tatsächliche Verbrauch kann deutlich abweichen. Maßgeblich sind immer die abgelesenen Druckwerte und die Entscheidung vor Ort.</p>
+    </div>
+    <div class="dfoot">
+      <span class="spacer"></span>
+      <button type="button" class="btn primary" data-close>Verstanden</button>
+    </div>
+  </form>
+</dialog>
+
+<input type="file" id="fileImport" accept=".json,application/json" class="hidden">
+<div id="toast" class="hidden"></div>
+
+<script>
+"use strict";
+
+/* ================= Speicher / Default ================= */
+const STORAGE_KEY = "as-sammelstelle-v1";
+const DEFAULT_WARN_MIN = 45;
+const DEFAULT_NUM_PERSONS_TRUPP = 2; // Standard Personenanzahl pro Trupp
+const DEFAULT_SUGGEST_FW = []; // Standard-Feuerwehr-Vorschlagswerte
+//const DEFAULT_SUGGEST_FW = ['FF Aching','FF Braunau','FF Haselbach','FF Ranshofen']; // Abschnitt-Braunau
+
+let state = { einsaetze: [], activeId: null };
+let view = "list";
+let filter = "alle";
+
+// alte Einzel-Notiz (String) in Notiz-Verlauf [{at, text}] umwandeln
+function migrate(e) {
+  e.trupps.forEach(t => {
+    if (!Array.isArray(t.notizen)) t.notizen = t.notiz ? [{ at: null, text: t.notiz }] : [];
+    delete t.notiz;
+  });
+  return e;
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s && Array.isArray(s.einsaetze)) state = { einsaetze: s.einsaetze.map(migrate), activeId: s.activeId || null };
+    }
+  } catch (e) {
+    console.error(e);
+    toast("Gespeicherte Daten konnten nicht gelesen werden!");
+  }
+}
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error(e);
+    alert("ACHTUNG: Speichern im LocalStorage fehlgeschlagen!\nBitte Daten exportieren.");
+  }
+}
+// Änderungen aus anderem Tab/Fenster übernehmen (z. B. Anzeige auf zweitem Bildschirm)
+window.addEventListener("storage", e => {
+  if (e.key !== STORAGE_KEY) return;
+  const keepActive = state.activeId;
+  load();
+  if (keepActive && state.einsaetze.some(x => x.id === keepActive)) state.activeId = keepActive;
+  render();
+});
+
+/* ================= Hilfsfunktionen ================= */
+const $ = sel => document.querySelector(sel);
+const pad = n => String(n).padStart(2, "0");
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+const nowHM = () => { const d = new Date(); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+const todayISO = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Anzeige von Datum/Uhrzeit immer im Format der bevorzugten Browsersprache (erste Sprache der Liste)
+const LOCALE = (navigator.languages && navigator.languages[0]) || navigator.language || undefined;
+const fmtDate = iso => { if (!iso) return ""; const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString(LOCALE); };
+const fmtTime = hm => { if (!hm) return ""; const [h, m] = hm.split(":").map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d.toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" }); };
+const fmtStamp = iso => new Date(iso).toLocaleString(LOCALE, { dateStyle: "short", timeStyle: "short" });
+const touch = e => { e.modifiedAt = new Date().toISOString(); };
+const hmToMin = hm => { if (!hm) return null; const [h, m] = hm.split(":").map(Number); return h * 60 + m; };
+const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+// Differenz in Minuten, über Mitternacht hinweg
+function diffMin(fromHM, toHM) {
+  const a = hmToMin(fromHM), b = toHM == null ? nowMin() : hmToMin(toHM);
+  if (a == null || b == null) return null;
+  let d = b - a; if (d < 0) d += 1440; return d;
+}
+function fmtDur(min) {
+  if (min == null) return "";
+  if (min < 60) return min + " min";
+  return Math.floor(min / 60) + ":" + pad(min % 60) + " h";
+}
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show"); t.classList.remove("hidden");
+  clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove("show"); t.classList.add("hidden") }, 2500);
+}
+
+const current = () => state.einsaetze.find(e => e.id === state.activeId) || null;
+const status = t => t.rueckmeldung ? "zurueck" : t.abmarsch ? "einsatz" : "wartend";
+const STATUS_TXT = { wartend: "Wartend", einsatz: "Im Einsatz", zurueck: "Zurück" };
+const truppLabel = t => t.name ? t.name : "Trupp " + t.nr;
+const personNames = t => (t.personen || []).map(p => p.name).filter(Boolean);
+const feuerwehren = t => [...new Set((t.personen || []).map(p => (p.fw || "").trim()).filter(Boolean))];
+// Warteschlange: wartende Trupps nach Anmeldezeit, dann Nummer
+function queue(e) {
+  return e.trupps.filter(t => status(t) === "wartend")
+    .sort((a, b) => (hmToMin(a.anmeldung) ?? 0) - (hmToMin(b.anmeldung) ?? 0) || a.nr - b.nr);
+}
+// Dauer-Anzeige; bei Überschreitung mit Warnsymbol
+function durHtml(e, min) {
+  const c = durClass(e, min);
+  return `<span class="dur ${c}">${c === "alarm" ? "⚠ " : ""}${fmtDur(min)}</span>`;
+}
+function durClass(e, min) {
+  const w = e.warnMin || DEFAULT_WARN_MIN;
+  if (min >= w) return "alarm";
+  if (min >= w * 0.8) return "warn";
+  return "";
+}
+
+/* ================= Rendering ================= */
+function render() {
+  const e = current();
+  if (!e && view !== "list") view = "list";
+  $("#viewList").classList.toggle("hidden", view !== "list");
+  $("#viewEinsatz").classList.toggle("hidden", view !== "einsatz");
+  $("#viewDisplay").classList.toggle("hidden", view !== "display");
+  // Tabelle/Übersicht wechseln sich ab: nur den Button zur jeweils anderen Ansicht zeigen
+  $("#btnViewEinsatz").classList.toggle("hidden", !e || view === "einsatz");
+  $("#btnViewDisplay").classList.toggle("hidden", !e || view === "display");
+  $("#hdrInfo").textContent = e ? `${e.bezeichnung} · ${fmtDate(e.datum)} · Beginn ${fmtTime(e.beginn)}` : "Kein Einsatz gewählt";
+  document.title = e ? `AS-Sammelstelle – ${e.bezeichnung}` : "AS-Sammelstelle";
+  if (view === "list") renderList();
+  if (view === "einsatz") renderEinsatz(e);
+  if (view === "display") renderDisplay(e);
+}
+
+function exportInfo(e) {
+  if (!e.exportedAt) return `<div class="meta export-info stale">Noch nie exportiert</div>`;
+  const stale = e.modifiedAt && e.modifiedAt > e.exportedAt;
+  return `<div class="meta export-info ${stale ? "stale" : ""}">Exportiert ${fmtStamp(e.exportedAt)}${stale ? " – seither geändert" : ""}</div>`;
+}
+function einsatzCard(e) {
+  const counts = { wartend: 0, einsatz: 0, zurueck: 0 };
+  e.trupps.forEach(t => counts[status(t)]++);
+  return `<div class="card ${e.id === state.activeId ? "current" : ""} ${e.closedAt ? "closed" : ""}">
+    <h3>${esc(e.bezeichnung)}<span class="tag ${e.closedAt ? "closed" : "open"}">${e.closedAt ? "🔒 Abgeschlossen" : "Aktiv"}</span></h3>
+    <div class="meta">${fmtDate(e.datum)} · Beginn ${esc(fmtTime(e.beginn))}${e.closedAt ? ` · Abgeschlossen ${fmtStamp(e.closedAt)}` : ""}</div>
+    <div class="meta">${e.trupps.length} Trupps – ${counts.wartend} wartend, ${counts.einsatz} im Einsatz, ${counts.zurueck} zurück</div>
+    ${exportInfo(e)}
+    <div class="actions">
+      <button class="btn primary" data-action="open-einsatz" data-id="${e.id}">Öffnen</button>
+      <button class="btn small" data-action="export-one" data-id="${e.id}">⤒ Export</button>
+      <button class="btn small danger" data-action="delete-einsatz" data-id="${e.id}">🗑 Löschen</button>
+    </div>
+  </div>`;
+}
+function renderList() {
+  const byDate = (a, b) => (b.datum + b.beginn).localeCompare(a.datum + a.beginn);
+  const aktiv = state.einsaetze.filter(e => !e.closedAt).sort(byDate);
+  const closed = state.einsaetze.filter(e => e.closedAt).sort(byDate);
+  let html = "";
+  if (aktiv.length) html += `<div class="list-head">Aktive Einsätze</div><div class="cards">${aktiv.map(einsatzCard).join("")}</div>`;
+  if (closed.length) html += `<div class="list-head">Abgeschlossene Einsätze</div><div class="cards">${closed.map(einsatzCard).join("")}</div>`;
+  $("#einsatzCards").innerHTML = html || `<div class="empty">Noch keine Einsätze vorhanden.<br>Lege mit „Neuer Einsatz“ einen an oder importiere eine Datei.</div>`;
+}
+
+function renderStats(e, el) {
+  const c = { wartend: 0, einsatz: 0, zurueck: 0 }, p = { wartend: 0, einsatz: 0, zurueck: 0 };
+  e.trupps.forEach(t => { const s = status(t); c[s]++; p[s] += personNames(t).length; });
+  el.innerHTML = `
+    <div class="stat wait"><div class="val">${c.wartend}</div><div class="lbl">Trupps wartend (${p.wartend} Pers.)</div></div>
+    <div class="stat active"><div class="val">${c.einsatz}</div><div class="lbl">Trupps im Einsatz (${p.einsatz} Pers.)</div></div>
+    <div class="stat done"><div class="val">${c.zurueck}</div><div class="lbl">Trupps zurück (${p.zurueck} Pers.)</div></div>
+    <div class="stat"><div class="val">${e.trupps.length}</div><div class="lbl">Trupps gesamt (${p.wartend + p.einsatz + p.zurueck} Pers.)</div></div>`;
+}
+
+function renderEinsatz(e) {
+  $("#viewEinsatz").classList.toggle("is-closed", !!e.closedAt);
+  $("#closedBanner").classList.toggle("hidden", !e.closedAt);
+  $("#closedBanner").textContent = e.closedAt ? `🔒 Dieser Einsatz wurde am ${fmtStamp(e.closedAt)} abgeschlossen – keine Änderungen mehr möglich.` : "";
+  renderStats(e, $("#stats"));
+  document.querySelectorAll("#filterChips .chip").forEach(c => c.setAttribute("aria-pressed", c.dataset.filter === filter));
+  const q = queue(e);
+  const order = { einsatz: 0, wartend: 1, zurueck: 2 };
+  const rows = e.trupps
+    .filter(t => filter === "alle" || status(t) === filter)
+    .sort((a, b) => order[status(a)] - order[status(b)] || a.nr - b.nr);
+  if (!rows.length) {
+    $("#truppBody").innerHTML = `<tr><td colspan="12" class="empty">${e.trupps.length ? "Keine Trupps in diesem Filter." : "Noch keine Trupps angemeldet."}</td></tr>`;
+    return;
+  }
+  $("#truppBody").innerHTML = rows.map(t => {
+    const s = status(t);
+    let statusCell = `<span class="badge ${s}">${STATUS_TXT[s]}</span>`;
+    let dur = "", act = "", over = false;
+    if (s === "wartend") {
+      const pos = q.indexOf(t) + 1;
+      statusCell += `<div class="sub">Pos. ${pos} · ${pos - 1} davor</div><div class="sub">wartet ${fmtDur(diffMin(t.anmeldung))}</div>`;
+      act = `<button class="btn go small" data-action="abmarsch" data-id="${t.id}">▶ Abmarsch</button>`;
+    } else if (s === "einsatz") {
+      const m = diffMin(t.abmarsch);
+      dur = durHtml(e, m);
+      if (durClass(e, m) === "alarm") { over = true; statusCell += `<br><span class="badge over">⚠ Zeit überschritten</span>`; }
+      act = `<button class="btn back small" data-action="rueck" data-id="${t.id}">◀ Rückmeldung</button>`;
+    } else {
+      dur = `<span class="dur">${fmtDur(diffMin(t.abmarsch, t.rueckmeldung))}</span>`;
+      act = `<button class="btn small" data-action="requeue" data-id="${t.id}" title="Gleiche Personen als neuen Trupp anmelden">↻ Neu anmelden</button>`;
+    }
+    return `<tr class="s-${s} ${over ? "over" : ""}" data-action="edit-trupp" data-id="${t.id}">
+      <td class="nr">${t.nr}</td>
+      <td><div class="trupp-name">${esc(truppLabel(t))}</div>${(t.notizen || []).map(n => `<div class="sub note-line">${n.at ? `<span class="at">${esc(new Date(n.at).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" }))}</span>` : ""}${esc(n.text)}</div>`).join("")}</td>
+      <td class="personen">${personNames(t).map(esc).join("<br>")}</td>
+      <td>${feuerwehren(t).map(esc).join("<br>")}</td>
+      <td class="time">${esc(fmtTime(t.anmeldung))}</td>
+      <td class="sep">${statusCell}</td>
+      <td class="sep time">${esc(fmtTime(t.abmarsch))}</td>
+      <td>${esc(t.abschnitt || "")}</td>
+      <td>${esc(t.funk || "")}</td>
+      <td class="time">${dur}</td>
+      <td class="sep time">${esc(fmtTime(t.rueckmeldung))}</td>
+      <td class="act">${act}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderDisplay(e) {
+  $("#viewDisplay").classList.toggle("is-closed-disp", !!e.closedAt);
+  $("#dispNewTrupp").classList.toggle("hidden", !!e.closedAt);
+  $("#dispTitle").textContent = `${e.bezeichnung} · ${fmtDate(e.datum)}`;
+  renderStats(e, $("#dispStats"));
+  const q = queue(e);
+  $("#dispWait").innerHTML = q.length ? q.map((t, i) => `
+    <li class="${i === 0 ? "next" : ""}" data-action="edit-trupp" data-id="${t.id}">
+      <div class="pos">${i + 1}</div>
+      <div class="main"><div class="t">${esc(truppLabel(t))} <span class="sub">#${t.nr}</span></div>
+        <div class="p">${personNames(t).map(esc).join(", ")}</div></div>
+      <div class="right">${i === 0 ? "<b>als Nächstes</b>" : `${i} Trupp${i === 1 ? "" : "s"} davor`}<div class="sub">seit ${esc(fmtTime(t.anmeldung))}</div></div>
+      ${e.closedAt ? "" : `<button class="btn go small disp-act" data-action="abmarsch" data-id="${t.id}">▶ Abmarsch</button>`}
+    </li>`).join("") : `<li class="empty">Keine wartenden Trupps</li>`;
+  const act = e.trupps.filter(t => status(t) === "einsatz").sort((a, b) => (hmToMin(a.abmarsch) ?? 0) - (hmToMin(b.abmarsch) ?? 0));
+  $("#dispActive").innerHTML = act.length ? act.map(t => {
+    const m = diffMin(t.abmarsch);
+    return `<li class="${durClass(e, m) === "alarm" ? "over" : ""}" data-action="edit-trupp" data-id="${t.id}">
+      <div class="main"><div class="t">${esc(truppLabel(t))} <span class="sub">#${t.nr}</span></div>
+        <div class="p">${esc(t.abschnitt || "–")}${t.funk ? " · " + esc(t.funk) : ""}</div></div>
+      <div class="right">${durHtml(e, m)}<div class="sub">ab ${esc(fmtTime(t.abmarsch))}</div></div>
+      ${e.closedAt ? "" : `<button class="btn back small disp-act" data-action="rueck" data-id="${t.id}">◀ Rückmeldung</button>`}
+    </li>`;
+  }).join("") : `<li class="empty">Kein Trupp im Einsatz</li>`;
+}
+
+/* ================= Selbstlernende Vorschlagslisten ================= */
+// Eigene Umsetzung statt <datalist>, damit die Suche in allen Browsern/Tablets gleich funktioniert:
+// Treffer = Eingabe kommt irgendwo im Wert vor (Groß/Klein egal), Treffer am Wortanfang zuerst.
+const SUGGEST_FIELDS = {
+  pn: { trupp: t => (t.personen || []).map(p => p.name), live: null },
+  fw: { trupp: t => (t.personen || []).map(p => p.fw), live: ".fw" },
+  ab: { trupp: t => [t.abschnitt], live: '[name="abschnitt"]' },
+  fu: { trupp: t => [t.funk], live: '[name="funk"]' }
+};
+function suggestOptions(input) {
+  const kind = SUGGEST_FIELDS[input.dataset.suggest];
+  const set = new Set();
+  if (input.dataset.suggest == 'fw' && DEFAULT_SUGGEST_FW) {
+    DEFAULT_SUGGEST_FW.forEach(fw => { if (fw) set.add(fw); });
+  }
+  const e = current();
+  (e ? e.trupps : []).forEach(t => kind.trupp(t).forEach(v => { v = (v || "").trim(); if (v) set.add(v); }));
+  // schon während der Eingabe lernen: Werte aus den anderen Feldern des offenen Dialogs
+  const dlg = input.closest("dialog");
+  if (kind.live && dlg) dlg.querySelectorAll(kind.live).forEach(i => { const v = i.value.trim(); if (v && i !== input) set.add(v); });
+  return [...set];
+}
+
+const suggestBox = document.createElement("ul");
+suggestBox.className = "suggest hidden";
+let suggestInput = null, suggestIdx = -1;
+
+function suggestShow(input) {
+  const q = input.value.trim().toLowerCase();
+  const hits = suggestOptions(input)
+    .filter(v => v.toLowerCase() !== q && v.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const pa = a.toLowerCase().startsWith(q) ? 0 : 1, pb = b.toLowerCase().startsWith(q) ? 0 : 1;
+      return pa - pb || a.localeCompare(b, LOCALE);
+    });
+  suggestInput = input; suggestIdx = -1;
+  if (!hits.length) { suggestHide(); return; }
+  suggestBox.innerHTML = hits.map(v => `<li data-value="${esc(v)}">${esc(v)}</li>`).join("");
+  // in den Dialog hängen (Top-Layer), sonst läge die Liste hinter dem Dialog
+  (input.closest("dialog") || document.body).append(suggestBox);
+  suggestBox.classList.remove("hidden");
+  suggestPlace();
+}
+function suggestPlace() {
+  if (!suggestInput || suggestBox.classList.contains("hidden")) return;
+  const r = suggestInput.getBoundingClientRect();
+  const below = window.innerHeight - r.bottom, above = r.top;
+  suggestBox.style.left = r.left + "px";
+  suggestBox.style.width = r.width + "px";
+  if (below < 180 && above > below) {
+    suggestBox.style.top = ""; suggestBox.style.bottom = (window.innerHeight - r.top + 2) + "px";
+    suggestBox.style.maxHeight = Math.min(260, above - 8) + "px";
+  } else {
+    suggestBox.style.bottom = ""; suggestBox.style.top = (r.bottom + 2) + "px";
+    suggestBox.style.maxHeight = Math.min(260, below - 8) + "px";
+  }
+}
+function suggestHide() { suggestBox.classList.add("hidden"); suggestInput = null; suggestIdx = -1; }
+function suggestPick(value) {
+  const input = suggestInput;
+  input.value = value;
+  suggestHide();
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+document.addEventListener("focusin", ev => { if (ev.target.dataset && ev.target.dataset.suggest) suggestShow(ev.target); });
+document.addEventListener("input", ev => { if (ev.target.dataset && ev.target.dataset.suggest) suggestShow(ev.target); });
+document.addEventListener("focusout", ev => { if (ev.target === suggestInput) suggestHide(); });
+document.addEventListener("scroll", suggestPlace, true);
+window.addEventListener("resize", suggestPlace);
+// pointerdown + preventDefault: Fokus bleibt im Feld, Auswahl funktioniert mit Finger und Maus
+suggestBox.addEventListener("pointerdown", ev => {
+  const li = ev.target.closest("li");
+  ev.preventDefault();
+  if (li) suggestPick(li.dataset.value);
+});
+document.addEventListener("keydown", ev => {
+  if (!suggestInput || ev.target !== suggestInput || suggestBox.classList.contains("hidden")) return;
+  const items = [...suggestBox.children];
+  if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+    ev.preventDefault();
+    suggestIdx = (suggestIdx + (ev.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items.forEach((li, i) => li.classList.toggle("active", i === suggestIdx));
+    items[suggestIdx].scrollIntoView({ block: "nearest" });
+  } else if (ev.key === "Enter" && suggestIdx >= 0) {
+    ev.preventDefault(); suggestPick(items[suggestIdx].dataset.value);
+  } else if (ev.key === "Escape") {
+    ev.preventDefault(); ev.stopPropagation(); suggestHide();
+  }
+});
+
+function tick() {
+  const d = new Date();
+  const hm = pad(d.getHours()) + ":" + pad(d.getMinutes());
+  $("#clock").textContent = d.toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
+  $("#dispClock").textContent = d.toLocaleTimeString(LOCALE);
+  // Dauer-/Wartezeiten jede volle Minute aktualisieren
+  if (tick.last !== hm) { tick.last = hm; if (view !== "list") render(); }
+}
+
+/* ================= Eingaben trimmen ================= */
+const isTextField = el => el.matches('textarea, input:not([type]), input[type="text"], input[type="search"]');
+// beim Verlassen eines Feldes sichtbar trimmen
+document.addEventListener("change", ev => { if (isTextField(ev.target)) ev.target.value = ev.target.value.trim(); }, true);
+// vor jedem Speichern alle Textfelder trimmen; Pflichtfelder, die nur aus Leerzeichen bestanden, abweisen
+document.addEventListener("submit", ev => {
+  const fields = [...ev.target.elements].filter(isTextField);
+  fields.forEach(el => { el.value = el.value.trim(); });
+  const empty = fields.find(el => el.required && !el.value);
+  if (empty) { ev.preventDefault(); ev.stopPropagation(); empty.reportValidity(); }
+}, true);
+
+/* ================= Notiz-Verlauf ================= */
+function renderNotesLog(dlg, t) {
+  const list = (t && t.notizen) || [];
+  // ohne Einträge den ganzen Bereich "Notizen" ausblenden
+  dlg.querySelector(".notes-old").classList.toggle("hidden", !list.length);
+  dlg.querySelector(".notes-log").innerHTML = list
+    .map(n => `<li><span class="at">${n.at ? esc(fmtStamp(n.at)) : "–"}</span><span>${esc(n.text)}</span></li>`).join("");
+  dlg.querySelector('[name="notiz"]').value = "";
+}
+// neuen Eintrag nur anhängen, wenn tatsächlich etwas eingegeben wurde
+function addNote(notizen, text) {
+  text = text.trim();
+  return text ? [...(notizen || []), { at: new Date().toISOString(), text }] : (notizen || []);
+}
+
+/* ================= Dialoge ================= */
+let editTruppId = null, actionTruppId = null, editEinsatzId = null;
+
+function openDialog(dlg) { dlg.showModal(); }
+document.querySelectorAll("dialog").forEach(dlg => {
+  dlg.addEventListener("click", ev => {
+    if (ev.target.closest("[data-close]")) dlg.close();
+    const nowBtn = ev.target.closest("[data-now]");
+    if (nowBtn) dlg.querySelector(`[name="${nowBtn.dataset.now}"]`).value = nowHM();
+  });
+});
+
+// --- Einsatz ---
+function showEinsatzDialog(e) {
+  const f = $("#formEinsatz");
+  editEinsatzId = e ? e.id : null;
+  $("#dlgEinsatzTitle").textContent = e ? "Einsatzdaten bearbeiten" : "Neuer Einsatz";
+  f.bezeichnung.value = e ? e.bezeichnung : "";
+  f.datum.value = e ? e.datum : todayISO();
+  f.beginn.value = e ? e.beginn : nowHM();
+  f.warnMin.value = e ? (e.warnMin || DEFAULT_WARN_MIN) : DEFAULT_WARN_MIN;
+  $("#btnDelEinsatz").classList.toggle("hidden", !e);
+  openDialog($("#dlgEinsatz"));
+}
+$("#formEinsatz").addEventListener("submit", () => {
+  const f = $("#formEinsatz");
+  const data = {
+    bezeichnung: f.bezeichnung.value.trim(), datum: f.datum.value, beginn: f.beginn.value,
+    warnMin: parseInt(f.warnMin.value, 10) || DEFAULT_WARN_MIN
+  };
+  if (editEinsatzId) {
+    const e = state.einsaetze.find(x => x.id === editEinsatzId);
+    if (e.closedAt) return;
+    Object.assign(e, data); touch(e);
+  } else {
+    const e = { id: uid(), ...data, trupps: [], modifiedAt: new Date().toISOString() };
+    state.einsaetze.push(e);
+    state.activeId = e.id;
+    view = "einsatz";
+  }
+  save(); render();
+});
+
+// --- Trupp ---
+function personRow(p = {}) {
+  const div = document.createElement("div");
+  div.className = "person-row";
+  div.innerHTML = `
+    <input class="pn" placeholder="Name Person" data-suggest="pn" value="${esc(p.name || "")}" autocomplete="off">
+    <input class="fw" placeholder="Feuerwehr" data-suggest="fw" value="${esc(p.fw || "")}" autocomplete="off">
+    <button type="button" class="rm" title="Person entfernen" aria-label="Person entfernen">×</button>`;
+  div.querySelector(".rm").onclick = () => div.remove();
+  return div;
+}
+$("#dlgTrupp").addEventListener("click", ev => {
+  if (ev.target.closest('[data-action="add-person"]')) {
+    // Feuerwehr der letzten Person vorbelegen
+    const last = [...document.querySelectorAll("#personList .fw")].pop();
+    const row = personRow({ fw: last ? last.value : "" });
+    $("#personList").append(row);
+    row.querySelector(".pn").focus();
+  }
+});
+
+function showTruppDialog(t, preset) {
+  const e = current();
+  const f = $("#formTrupp");
+  editTruppId = t ? t.id : null;
+  const src = t || preset || {};
+  $("#dlgTruppTitle").textContent = t ? `Trupp ${t.nr} bearbeiten` : "Neuer Trupp";
+  f.nr.value = t ? t.nr : Math.max(0, ...e.trupps.map(x => x.nr)) + 1;
+  f.name.value = t ? truppLabel(t) : "";
+  f.anmeldung.value = t ? t.anmeldung : nowHM();
+  f.abmarsch.value = t ? (t.abmarsch || "") : "";
+  f.abschnitt.value = t ? (t.abschnitt || "") : "";
+  f.funk.value = t ? (t.funk || "") : "";
+  f.rueckmeldung.value = t ? (t.rueckmeldung || "") : "";
+  renderNotesLog($("#dlgTrupp"), t);
+  const pl = $("#personList"); pl.innerHTML = "";
+  const persons = (src.personen && src.personen.length) ? src.personen : Array.from({ length: DEFAULT_NUM_PERSONS_TRUPP }, () => ({}));
+  persons.forEach((p, i) => pl.append(personRow(p.name || p.fw ? p : (i > 0 ? { fw: persons[0].fw } : p))));
+  $("#btnDelTrupp").classList.toggle("hidden", !t);
+  openDialog($("#dlgTrupp"));
+  if (!t) f.name.focus();
+}
+$("#formTrupp").addEventListener("submit", ev => {
+  const e = current();
+  const f = $("#formTrupp");
+  const nr = parseInt(f.nr.value, 10);
+  if (e.trupps.some(x => x.nr === nr && x.id !== editTruppId)) {
+    ev.preventDefault();
+    alert(`Die Nummer ${nr} ist bereits vergeben.`);
+    return;
+  }
+  const name = f.name.value.trim();
+  if (!name) {
+    ev.preventDefault();
+    alert("Bitte einen Truppnamen eingeben.");
+    f.name.value = ""; f.name.focus();
+    return;
+  }
+  const dup = e.trupps.find(x => x.id !== editTruppId && truppLabel(x).trim().toLowerCase() === name.toLowerCase());
+  if (dup) {
+    ev.preventDefault();
+    alert(`Der Truppname „${name}“ ist in diesem Einsatz bereits vergeben (Trupp #${dup.nr}).`);
+    f.name.focus();
+    return;
+  }
+  const personen = [...document.querySelectorAll("#personList .person-row")]
+    .map(r => ({ name: r.querySelector(".pn").value.trim(), fw: r.querySelector(".fw").value.trim() }))
+    .filter(p => p.name); // Zeilen ohne Namen (z. B. nur vorbelegte Feuerwehr) verwerfen
+  if (!personen.length) {
+    ev.preventDefault();
+    alert("Bitte mindestens einen Personennamen eingeben.");
+    const first = document.querySelector("#personList .pn");
+    if (first) first.focus(); else document.querySelector('[data-action="add-person"]').click();
+    return;
+  }
+  if (f.rueckmeldung.value && !f.abmarsch.value) {
+    ev.preventDefault();
+    alert("Rückmeldung ohne Abmarschzeit ist nicht möglich.");
+    return;
+  }
+  const data = {
+    nr, name, personen, anmeldung: f.anmeldung.value,
+    abmarsch: f.abmarsch.value, abschnitt: f.abschnitt.value.trim(), funk: f.funk.value.trim(),
+    rueckmeldung: f.rueckmeldung.value
+  };
+  const old = editTruppId ? e.trupps.find(x => x.id === editTruppId) : null;
+  data.notizen = addNote(old && old.notizen, f.notiz.value);
+  if (e.closedAt) return;
+  if (editTruppId) Object.assign(e.trupps.find(x => x.id === editTruppId), data);
+  else { e.trupps.push({ id: uid(), ...data }); toast(`${truppLabel(data)} angemeldet`); }
+  touch(e); save(); render();
+});
+
+// --- Abmarsch ---
+function showAbmarsch(t) {
+  actionTruppId = t.id;
+  const f = $("#formAbmarsch");
+  $("#dlgAbmarschTitle").textContent = `Abmarsch: ${truppLabel(t)} (#${t.nr})`;
+  f.abmarsch.value = nowHM();
+  f.abschnitt.value = t.abschnitt || "";
+  f.funk.value = t.funk || "";
+  renderNotesLog($("#dlgAbmarsch"), t);
+  openDialog($("#dlgAbmarsch"));
+}
+$("#formAbmarsch").addEventListener("submit", () => {
+  const e = current();
+  if (e.closedAt) return;
+  const t = e.trupps.find(x => x.id === actionTruppId);
+  const f = $("#formAbmarsch");
+  Object.assign(t, { abmarsch: f.abmarsch.value, abschnitt: f.abschnitt.value.trim(), funk: f.funk.value.trim(), notizen: addNote(t.notizen, f.notiz.value) });
+  touch(e); save(); render(); toast(`${truppLabel(t)} abmarschiert${t.abschnitt ? " → " + t.abschnitt : ""}`);
+});
+
+// --- Rückmeldung ---
+function showRueck(t) {
+  actionTruppId = t.id;
+  $("#dlgRueckTitle").textContent = `Rückmeldung: ${truppLabel(t)} (#${t.nr})`;
+  $("#formRueck").rueckmeldung.value = nowHM();
+  renderNotesLog($("#dlgRueck"), t);
+  openDialog($("#dlgRueck"));
+}
+$("#formRueck").addEventListener("submit", () => {
+  const e = current();
+  if (e.closedAt) return;
+  const t = e.trupps.find(x => x.id === actionTruppId);
+  t.rueckmeldung = $("#formRueck").rueckmeldung.value;
+  t.notizen = addNote(t.notizen, $("#formRueck").notiz.value);
+  touch(e); save(); render(); toast(`${truppLabel(t)} zurückgemeldet`);
+});
+
+/* ================= Export / Import ================= */
+function download(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const safeName = s => String(s).replace(/[^\wäöüÄÖÜß\-]+/g, "_").slice(0, 60);
+function exportEinsaetze(list, name) {
+  const now = new Date().toISOString();
+  list.forEach(e => { e.exportedAt = now; });
+  download({ app: "AS-Sammelstelle", version: 1, exportiert: now, einsaetze: list }, name);
+  save(); render();
+}
+const exportOne = e => exportEinsaetze([e], `AS-Sammelstelle_${e.datum}_${safeName(e.bezeichnung)}.json`);
+const exportAll = () => exportEinsaetze(state.einsaetze, `AS-Sammelstelle_alle_${todayISO()}.json`);
+
+/* ================= Löschen mit Export-Nachfrage ================= */
+let deleteHandler = null;
+function askDelete({ title, html, onExport, onDelete }) {
+  $("#dlgDeleteTitle").textContent = title;
+  $("#dlgDeleteText").innerHTML = html;
+  deleteHandler = { onExport, onDelete };
+  openDialog($("#dlgDelete"));
+}
+$("#btnDelExport").addEventListener("click", () => {
+  deleteHandler.onExport();
+  // Download kurz anlaufen lassen, bevor gelöscht wird
+  setTimeout(() => { deleteHandler.onDelete(); $("#dlgDelete").close(); }, 300);
+});
+$("#btnDelNoExport").addEventListener("click", () => {
+  if (!confirm("Wirklich OHNE Export löschen? Die Daten sind danach unwiderruflich weg.")) return;
+  deleteHandler.onDelete(); $("#dlgDelete").close();
+});
+
+function deleteEinsatz(x) {
+  const stale = !x.exportedAt || (x.modifiedAt && x.modifiedAt > x.exportedAt);
+  askDelete({
+    title: `Einsatz löschen: ${x.bezeichnung}`,
+    html: `<p>Der Einsatz „<b>${esc(x.bezeichnung)}</b>“ vom ${fmtDate(x.datum)} mit ${x.trupps.length} Trupps wird gelöscht.</p>
+      <p><b>Wurde der Einsatz exportiert?</b></p>
+      ${stale
+        ? `<div class="warnbox">${x.exportedAt ? `Zuletzt exportiert ${fmtStamp(x.exportedAt)} – seither wurde der Einsatz geändert.` : "Dieser Einsatz wurde noch nie exportiert."}</div>`
+        : `<p>Zuletzt exportiert ${fmtStamp(x.exportedAt)}, seither unverändert.</p>`}`,
+    onExport: () => exportOne(x),
+    onDelete: () => {
+      state.einsaetze = state.einsaetze.filter(y => y.id !== x.id);
+      if (state.activeId === x.id) { state.activeId = null; view = "list"; }
+      $("#dlgEinsatz").close();
+      save(); render(); toast("Einsatz gelöscht");
+    }
+  });
+}
+
+function clearStorage() {
+  const n = state.einsaetze.length;
+  askDelete({
+    title: "Lokalen Speicher vollständig leeren",
+    html: `<div class="warnbox">Alle ${n} Einsätze dieser Seite werden aus dem LocalStorage gelöscht!</div>
+      <p><b>Wurden alle Einsätze exportiert?</b></p>`,
+    onExport: () => { if (n) exportAll(); },
+    onDelete: () => {
+      try {
+        // nur die Schlüssel dieser Anwendung – bei file:// teilen sich ggf. mehrere lokale Seiten einen Speicher
+        Object.keys(localStorage).filter(k => k.startsWith("as-sammelstelle")).forEach(k => localStorage.removeItem(k));
+      } catch (e) { console.error(e); }
+      state = { einsaetze: [], activeId: null };
+      view = "list"; render(); toast("Lokaler Speicher geleert");
+    }
+  });
+}
+
+function closeEinsatz(e) {
+  const offen = e.trupps.filter(t => status(t) !== "zurueck");
+  let msg = `Einsatz „${e.bezeichnung}“ abschließen?\n\nDanach sind KEINE Änderungen mehr möglich.`;
+  if (offen.length) msg += `\n\nACHTUNG: ${offen.length} Trupp(s) noch nicht zurückgemeldet:\n` +
+    offen.map(t => `  #${t.nr} ${truppLabel(t)} – ${STATUS_TXT[status(t)]}`).join("\n");
+  if (!confirm(msg)) return;
+  e.closedAt = new Date().toISOString(); touch(e);
+  save(); render(); toast("Einsatz abgeschlossen");
+}
+function validEinsatz(e) {
+  return e && typeof e === "object" && e.bezeichnung && Array.isArray(e.trupps);
+}
+$("#fileImport").addEventListener("change", async ev => {
+  const file = ev.target.files[0]; ev.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    const list = Array.isArray(data.einsaetze) ? data.einsaetze : (validEinsatz(data) ? [data] : null);
+    if (!list || !list.every(validEinsatz)) throw new Error("Unbekanntes Format");
+    let n = 0;
+    for (const imp of list) {
+      imp.trupps.forEach(t => { t.id = t.id || uid(); t.personen = t.personen || []; });
+      migrate(imp);
+      const idx = state.einsaetze.findIndex(e => e.id && e.id === imp.id);
+      if (idx >= 0) {
+        if (confirm(`Einsatz „${imp.bezeichnung}“ (${fmtDate(imp.datum)}) existiert bereits.\n\nOK = überschreiben\nAbbrechen = als Kopie importieren`)) {
+          state.einsaetze[idx] = imp;
+        } else {
+          state.einsaetze.push({ ...imp, id: uid(), bezeichnung: imp.bezeichnung + " (Kopie)" });
+        }
+      } else {
+        state.einsaetze.push({ ...imp, id: imp.id || uid() });
+      }
+      n++;
+    }
+    save(); render(); toast(`${n} Einsatz/Einsätze importiert`);
+  } catch (e) {
+    alert("Import fehlgeschlagen: " + e.message);
+  }
+});
+
+/* ================= Aktionen ================= */
+document.addEventListener("click", ev => {
+  const chip = ev.target.closest("[data-filter]");
+  if (chip) { filter = chip.dataset.filter; render(); return; }
+
+  const el = ev.target.closest("[data-action]");
+  if (!el || el.closest("dialog") && !["delete-trupp", "delete-einsatz"].includes(el.dataset.action)) return;
+  const e = current();
+  const t = e && el.dataset.id ? e.trupps.find(x => x.id === el.dataset.id) : null;
+  // abgeschlossener Einsatz: alle ändernden Aktionen sperren
+  const MUTATING = ["edit-einsatz", "close-einsatz", "new-trupp", "edit-trupp", "delete-trupp", "abmarsch", "rueck", "requeue"];
+  if (e && e.closedAt && MUTATING.includes(el.dataset.action)) return;
+
+  switch (el.dataset.action) {
+    case "view-list": view = "list"; render(); break;
+    case "view-einsatz": view = "einsatz"; render(); break;
+    case "view-display": view = "display"; render(); break;
+    case "new-einsatz": showEinsatzDialog(null); break;
+    case "edit-einsatz": showEinsatzDialog(e); break;
+    case "open-einsatz": state.activeId = el.dataset.id; save(); view = "display"; filter = "alle"; render(); break;
+    case "delete-einsatz": {
+      const x = state.einsaetze.find(y => y.id === (el.dataset.id || editEinsatzId));
+      if (x) deleteEinsatz(x);
+      break;
+    }
+    case "close-einsatz": closeEinsatz(e); break;
+    case "clear-storage": clearStorage(); break;
+    case "new-trupp": showTruppDialog(null); break;
+    case "edit-trupp": if (t) showTruppDialog(t); break;
+    case "delete-trupp": {
+      const x = e.trupps.find(y => y.id === editTruppId);
+      if (x && confirm(`${truppLabel(x)} (#${x.nr}) wirklich löschen?`)) {
+        e.trupps = e.trupps.filter(y => y.id !== x.id);
+        touch(e); $("#dlgTrupp").close(); save(); render();
+      }
+      break;
+    }
+    case "abmarsch": ev.stopPropagation(); if (t) showAbmarsch(t); break;
+    case "rueck": ev.stopPropagation(); if (t) showRueck(t); break;
+    case "requeue": ev.stopPropagation(); if (t) showTruppDialog(null, { personen: t.personen.map(p => ({ ...p })) }); break;
+    case "export-current": exportOne(e); break;
+    case "export-one": exportOne(state.einsaetze.find(y => y.id === el.dataset.id)); break;
+    case "export-all":
+      if (!state.einsaetze.length) { toast("Keine Einsätze vorhanden"); break; }
+      exportAll(); break;
+    case "import": $("#fileImport").click(); break;
+    case "print": window.print(); break;
+    case "haftung": openDialog($("#dlgHaftung")); break;
+  }
+});
+
+/* ================= Start ================= */
+load();
+if (current()) view = "display";
+render();
+tick();
+setInterval(tick, 1000);
+// Haftungsausschluss beim Start: hier bewusst nicht (nur Link im Footer); bei Bedarf einkommentieren
+// openDialog($("#dlgHaftung"));
+</script>
+</body>
+</html>

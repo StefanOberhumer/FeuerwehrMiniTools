@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AS-Überwachung</title>
+<style>
+:root {
+  --bg: #f2f3f5;
+  --surface: #ffffff;
+  --surface-2: #e8eaee;
+  --text: #15181d;
+  --muted: #5c6470;
+  --border: #c9ced6;
+  --primary: #c8102e;      /* Feuerwehr-Rot */
+  --primary-text: #ffffff;
+  --wait: #1f5fbf;
+  --wait-bg: #e3ecfa;
+  --active: #c25e00;
+  --active-bg: #fdebd6;
+  --done: #1d7a3a;
+  --done-bg: #ddf2e3;
+  --warn: #8a6100;
+  --warn-bg: #fff1c2;
+  --alarm: #b00020;
+  --alarm-bg: #ffd9de;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111317;
+    --surface: #1b1e24;
+    --surface-2: #262a32;
+    --text: #eef0f3;
+    --muted: #9aa3af;
+    --border: #3a404a;
+    --primary: #e0334f;
+    --wait: #7eaaf0;
+    --wait-bg: #1c2a42;
+    --active: #ffab5c;
+    --active-bg: #3d2a14;
+    --done: #6fd18f;
+    --done-bg: #173322;
+    --warn: #ffd666;
+    --warn-bg: #3d3214;
+    --alarm: #ff6b7f;
+    --alarm-bg: #4a1720;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* ---------- Kopfzeile ---------- */
+header {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--primary); color: var(--primary-text);
+}
+header h1 { font-size: 1.25rem; margin: 0; white-space: nowrap; }
+header .einsatz-info { flex: 1; min-width: 0; font-size: .95rem; opacity: .95; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header .clock { font-variant-numeric: tabular-nums; font-size: 1.4rem; font-weight: 700; }
+header .hbtn {
+  min-height: 44px; padding: 0 14px; border-radius: var(--radius);
+  border: 2px solid rgba(255,255,255,.7); background: transparent; color: #fff; font-weight: 600; cursor: pointer;
+}
+header .hbtn:active { background: rgba(255,255,255,.2); }
+
+main { padding: 16px; max-width: 1600px; margin: 0 auto; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 48px; padding: 0 18px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font-weight: 600; cursor: pointer; user-select: none;
+}
+.btn:active { transform: scale(.97); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+.btn.wait    { background: var(--wait);   border-color: var(--wait);   color: #fff; }
+.btn.go      { background: var(--active); border-color: var(--active); color: #fff; }
+.btn.back    { background: var(--done);   border-color: var(--done);   color: #fff; }
+.btn.danger  { color: var(--alarm); border-color: var(--alarm); background: transparent; }
+.btn.small   { min-height: 40px; padding: 0 12px; font-size: .9rem; }
+.btn.big     { min-height: 60px; font-size: 1.15rem; padding: 0 26px; }
+@media (prefers-color-scheme: dark) { .btn.go, .btn.back, .btn.wait { color: #111; } }
+
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.toolbar .spacer { flex: 1; }
+
+/* ---------- Kennzahlen ---------- */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 16px; border-left: 6px solid var(--border);
+}
+.stat .val { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat .lbl { color: var(--muted); font-size: .9rem; }
+.stat.wait   { border-left-color: var(--wait); }
+.stat.active { border-left-color: var(--active); }
+.stat.done   { border-left-color: var(--done); }
+.stat.alarm  { border-left-color: var(--alarm); }
+
+/* ---------- Filter ---------- */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; font-weight: 600;
+}
+.chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+/* ---------- Tabelle ---------- */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; min-width: 940px; font-size: .95rem; }
+th, td { padding: 8px 8px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { background: var(--surface-2); font-size: .75rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); position: sticky; top: 0; }
+th .th-sub { display: block; text-transform: none; letter-spacing: 0; font-weight: 400; }
+td .badge.alarm, td .badge.warn, td .badge.rueckweg { white-space: normal; }
+th.grp { text-align: center; border-left: 2px solid var(--border); }
+td.time, th.time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.sep, th.sep { border-left: 2px solid var(--border); }
+tbody tr { cursor: pointer; }
+tbody tr:active { background: var(--surface-2); }
+tr.s-bereit td:first-child { box-shadow: inset 6px 0 0 var(--wait); }
+tr.s-einsatz td:first-child { box-shadow: inset 6px 0 0 var(--active); }
+tr.s-beendet td:first-child { box-shadow: inset 6px 0 0 var(--done); }
+tr.s-beendet { color: var(--muted); }
+tr.lv-warn { background: var(--warn-bg); }
+tr.lv-alarm, tr.lv-alarm:active { background: var(--alarm-bg); }
+tr.lv-alarm td:first-child { box-shadow: inset 8px 0 0 var(--alarm); }
+.nr { font-weight: 800; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.trupp-name { font-weight: 700; }
+.personen { font-size: .95rem; }
+td.act { white-space: nowrap; }
+td.act > div { display: flex; flex-direction: column; gap: 6px; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .85rem; font-weight: 700; white-space: nowrap; }
+.badge.bereit  { background: var(--wait-bg); color: var(--wait); }
+.badge.einsatz { background: var(--active-bg); color: var(--active); }
+.badge.beendet { background: var(--done-bg); color: var(--done); }
+.badge.rueckweg { background: var(--wait-bg); color: var(--wait); margin-top: 4px; }
+.badge.alarm   { background: var(--alarm); color: #fff; margin-top: 4px; animation: blink 1s step-start infinite; }
+.badge.warn    { background: var(--warn-bg); color: var(--warn); margin-top: 4px; }
+@media (prefers-color-scheme: dark) { .badge.alarm { color: #111; } }
+.dur { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+@keyframes blink { 50% { opacity: .55; } }
+.sub { color: var(--muted); font-size: .85rem; }
+.empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+.crit { font-weight: 700; }
+.crit::after { content: " ▼"; color: var(--alarm); font-size: .8em; }
+
+/* ---------- Einsatzliste ---------- */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.card.current { border: 2px solid var(--primary); }
+.card h3 { margin: 0; font-size: 1.15rem; }
+.card .meta { color: var(--muted); font-size: .92rem; }
+.card .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.card.closed { opacity: .8; }
+.card .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700; vertical-align: middle; margin-left: 6px; }
+.tag.open   { background: var(--active-bg); color: var(--active); }
+.tag.closed { background: var(--surface-2); color: var(--muted); }
+.export-info.stale { color: var(--alarm); font-weight: 600; }
+.list-head { margin: 22px 0 10px; font-size: .9rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.list-head:first-child { margin-top: 0; }
+
+/* ---------- Übersicht (Überwachung) ---------- */
+.display-head { display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
+.display-head .big-clock { font-size: 3rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.display-head .title { font-size: 1.6rem; font-weight: 700; flex: 1; }
+.display-head #dispNewTrupp { align-self: center; }
+.sec-head { margin: 0 0 10px; padding: 10px 16px; border-radius: var(--radius); font-size: 1.3rem; color: #fff; }
+.sec-head.h-active { background: var(--active); }
+.sec-head.h-wait   { background: var(--wait); }
+.sec-head.h-done   { background: var(--done); }
+@media (prefers-color-scheme: dark) { .sec-head { color: #111; } }
+.mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.mcard {
+  background: var(--surface); border: 1px solid var(--border); border-left: 8px solid var(--active);
+  border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; cursor: pointer;
+}
+.mcard.lv-warn  { border-left-color: var(--warn); background: var(--warn-bg); }
+.mcard.lv-alarm { border-left-color: var(--alarm); background: var(--alarm-bg); }
+.mcard .mhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.mcard .t { font-size: 1.3rem; font-weight: 800; }
+.mcard .elapsed { font-size: 1.3rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mcard .mmeta { color: var(--muted); }
+.mcard .mpers, .mcard .mmess { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .95rem; }
+.mcard .mmess { font-size: .9rem; color: var(--muted); }
+.mcard .mmess b { color: var(--text); }
+.pbar { position: relative; height: 16px; background: var(--surface-2); border-radius: 8px; overflow: hidden; }
+.pbar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--done); transition: width 1s linear; }
+.lv-warn .pbar .fill  { background: var(--warn); }
+.lv-alarm .pbar .fill { background: var(--alarm); }
+.pbar i { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text); opacity: .45; }
+.pbar i.half { width: 4px; margin-left: -2px; opacity: .8; }
+.pbar-lbl { position: relative; height: 1.1em; font-size: .72rem; color: var(--muted); margin-top: -6px; }
+.pbar-lbl span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.mnums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mnums div { background: var(--surface-2); border-radius: 8px; padding: 6px 10px; }
+.mnums .lbl { display: block; font-size: .78rem; color: var(--muted); }
+.mnums b { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.malerts { display: grid; gap: 6px; }
+.malerts:empty { display: none; }
+.al { padding: 8px 12px; border-radius: 8px; font-weight: 700; }
+.al.alarm { background: var(--alarm); color: #fff; font-size: 1.15rem; animation: blink 1s step-start infinite; }
+.al.warn  { background: var(--surface); color: var(--warn); border: 2px solid var(--warn); }
+.al.info  { background: var(--surface-2); color: var(--muted); }
+.al.next  { padding: 0; color: var(--muted); font-weight: 600; }
+@media (prefers-color-scheme: dark) { .al.alarm { color: #111; } }
+.mact { display: flex; gap: 8px; flex-wrap: wrap; }
+.mact .btn { flex: 1; }
+.mlist { list-style: none; margin: 0 0 24px; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.mlist li { display: flex; gap: 14px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.mlist li:last-child { border-bottom: none; }
+.mlist li:active { background: var(--surface-2); }
+.mlist li .main { flex: 1; min-width: 0; }
+.mlist li .t { font-weight: 800; font-size: 1.15rem; }
+.mlist li .right { text-align: right; }
+.mlist li .btn { flex: none; }
+.mlist .empty { padding: 20px 16px; cursor: default; }
+@media (max-width: 600px) { .mlist li { flex-wrap: wrap; } .mlist li .btn { width: 100%; } .mgrid { grid-template-columns: 1fr; } }
+
+.closed-banner { background: var(--surface-2); border: 1px solid var(--border); border-left: 6px solid var(--muted); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; font-weight: 600; }
+.is-closed .edit-only, .is-closed td.act, .is-closed th.act { display: none !important; }
+.is-closed tbody tr, .is-closed .mcard, .is-closed .mlist li { cursor: default; }
+.storage-zone { margin-top: 32px; padding: 16px; border: 1px dashed var(--alarm); border-radius: var(--radius); display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.warnbox { background: var(--alarm-bg); color: var(--alarm); padding: 10px 14px; border-radius: 8px; font-weight: 600; }
+.hintbox { background: var(--warn-bg); color: var(--warn); padding: 10px 14px; border-radius: 8px; font-weight: 600; }
+.calc { background: var(--surface-2); border-radius: 8px; padding: 10px 14px; display: grid; gap: 6px; }
+.calc:empty { display: none; }
+.calc b { font-variant-numeric: tabular-nums; }
+
+/* ---------- Dialoge ---------- */
+dialog {
+  border: none; border-radius: 14px; padding: 0; width: min(760px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px); background: var(--surface); color: var(--text);
+  box-shadow: 0 20px 60px rgba(0,0,0,.4);
+}
+dialog::backdrop { background: rgba(0,0,0,.5); }
+dialog form { display: flex; flex-direction: column; max-height: calc(100vh - 24px); }
+dialog .dhead { padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 1.2rem; font-weight: 700; }
+dialog .dbody { padding: 16px 20px; overflow-y: auto; display: grid; gap: 14px; }
+dialog .dfoot { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; flex-wrap: wrap; }
+dialog .dfoot .spacer { flex: 1; }
+.rw-delay { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.rw-delay .btn { min-height: 56px; font-size: 1.05rem; }
+fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 0; display: grid; gap: 12px; }
+legend { font-weight: 700; padding: 0 6px; color: var(--muted); font-size: .9rem; text-transform: uppercase; letter-spacing: .03em; }
+label { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); font-weight: 600; }
+input, select, textarea {
+  min-height: 48px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font-size: 1.05rem; width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: 3px solid var(--wait); outline-offset: 1px; }
+input.warn-input { border: 2px solid var(--warn); background: var(--warn-bg); }
+textarea { min-height: 70px; resize: vertical; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.times { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.time-row { display: flex; gap: 8px; align-items: end; min-width: 0; }
+/* min-width: 0, sonst schiebt sich das Zeitfeld (mit Sekunden) über den "Jetzt"-Button */
+.time-row label { flex: 1; min-width: 0; }
+.time-row input { min-width: 0; }
+.time-row .btn { flex: none; }
+.person-head, .person-row { display: grid; grid-template-columns: 1.3fr 1fr 100px 140px 48px; gap: 8px; align-items: center; }
+.person-head { font-size: .8rem; color: var(--muted); font-weight: 600; }
+/* Enddruck-Spalte nur, wenn eine Endzeit eingetragen ist */
+.person-head .ed-h, .person-row .ed { display: none; }
+#dlgTrupp.with-ende .person-head, #dlgTrupp.with-ende .person-row { grid-template-columns: 1.3fr 1fr 90px 140px 90px 48px; }
+#dlgTrupp.with-ende .person-head .ed-h, #dlgTrupp.with-ende .person-row .ed { display: block; }
+.end-list { display: grid; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+/* jede Person als eigene Zeile mit Trennlinie und abwechselndem Hintergrund */
+.end-row { display: grid; grid-template-columns: 1fr 120px; gap: 12px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--border); }
+.end-row:first-child { border-top: none; }
+.end-row:nth-child(even) { background: var(--surface-2); }
+.end-row .who b { font-size: 1.05rem; color: var(--text); }
+.end-row .who .sub { display: block; }
+#personList { display: grid; gap: 8px; }
+.person-row .rm, .rm-mess { min-height: 48px; width: 48px; padding: 0; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--alarm); font-size: 1.4rem; cursor: pointer; }
+@media (max-width: 640px) {
+  .person-head { display: none; }
+  .person-row { grid-template-columns: 1fr 1fr 48px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .person-row .pn { grid-column: 1 / 3; grid-row: 1; }
+  .person-row .rm { grid-column: 3; grid-row: 1; }
+  .person-row .fw { grid-column: 1 / 4; grid-row: 2; }
+  .person-row .dr { grid-column: 1; grid-row: 3; }
+  .person-row .fl { grid-column: 2 / 4; grid-row: 3; }
+  #dlgTrupp.with-ende .person-row { grid-template-columns: 1fr 1fr 48px; }
+  .person-row .ed { grid-column: 1; grid-row: 4; }
+}
+
+footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 12px 16px 20px; }
+footer .linkbtn { background: none; border: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; min-height: 44px; padding: 0 4px; }
+
+.req { color: var(--primary); font-weight: 800; }
+.field-title { font-size: .9rem; color: var(--muted); font-weight: 600; }
+.req-note { font-size: .85rem; color: var(--muted); align-self: center; }
+
+.notes { display: grid; gap: 8px; }
+.notes-log { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 8px; max-height: 180px; overflow-y: auto; }
+.notes-log li { padding: 4px 12px; display: flex; gap: 12px; align-items: center; }
+.notes-log li:first-child { padding-top: 8px; }
+.notes-log li:last-child { padding-bottom: 8px; }
+.notes-log .at { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: .9rem; }
+.notes-log .grow { flex: 1; }
+.notes-old { display: grid; gap: 6px; }
+
+.suggest {
+  position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+.suggest li { padding: 12px 14px; min-height: 44px; cursor: pointer; }
+.suggest li + li { border-top: 1px solid var(--surface-2); }
+.suggest li.active, .suggest li:hover { background: var(--wait-bg); }
+
+input.readonly { background: var(--surface-2); color: var(--muted); border-style: dashed; pointer-events: none; }
+.print-only { display: none; }
+.hidden { display: none !important; }
+
+/* ---------- Toast ---------- */
+#toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(150%);
+  background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: var(--radius);
+  font-weight: 600; transition: transform .25s; z-index: 100; max-width: calc(100vw - 32px);
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ---------- Druck ---------- */
+@media print {
+  header .hbtn, .toolbar, .chips, .no-print, td.act, th.act, .mact, .mlist .btn { display: none !important; }
+  header { position: static; background: none; color: #000; border-bottom: 2px solid #000; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .table-wrap { border: none; overflow: visible; }
+  table { min-width: 0; }
+  th { position: static; }
+  .badge.alarm, .al.alarm { animation: none; }
+  tr.print-only { display: table-row; }
+  tr:has(+ tr.mess-row) td { border-bottom: none; }
+  tr.mess-row td { padding-top: 0; font-size: 10pt; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧯 AS-Überwachung</h1>
+  <div class="einsatz-info" id="hdrInfo">Kein Einsatz gewählt</div>
+  <div class="clock" id="clock">--:--</div>
+  <button class="hbtn" data-action="toggle-sound" id="btnSound" title="Warnton ein/aus">🔔</button>
+  <button class="hbtn" data-action="view-list">Einsätze</button>
+  <button class="hbtn" data-action="view-einsatz" id="btnViewEinsatz">Tabelle</button>
+  <button class="hbtn" data-action="view-display" id="btnViewDisplay">Übersicht</button>
+</header>
+
+<main>
+  <!-- ===== Einsatzliste ===== -->
+  <div id="viewList" class="hidden">
+    <div class="toolbar">
+      <button class="btn primary big" data-action="new-einsatz">＋ Neuer Einsatz</button>
+      <span class="spacer"></span>
+      <button class="btn" data-action="import">⤓ Importieren</button>
+      <button class="btn" data-action="export-all">⤒ Alle exportieren</button>
+    </div>
+    <div id="einsatzCards"></div>
+    <div class="storage-zone">
+      <div>
+        <b>Lokalen Speicher leeren</b>
+        <div class="sub">Löscht alle Einsätze dieser Seite aus dem LocalStorage dieses Browsers.</div>
+      </div>
+      <button class="btn danger" data-action="clear-storage">🗑 Speicher leeren</button>
+    </div>
+  </div>
+
+  <!-- ===== Einsatz / Trupp-Tabelle ===== -->
+  <div id="viewEinsatz" class="hidden">
+    <div class="closed-banner hidden" id="closedBanner"></div>
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <button class="btn primary big edit-only" data-action="new-trupp">＋ Neuer Trupp</button>
+      <div class="chips" id="filterChips">
+        <button class="chip" data-filter="alle" aria-pressed="true">Alle</button>
+        <button class="chip" data-filter="bereit" aria-pressed="false">Bereit</button>
+        <button class="chip" data-filter="einsatz" aria-pressed="false">Im Einsatz</button>
+        <button class="chip" data-filter="beendet" aria-pressed="false">Beendet</button>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn small edit-only" data-action="edit-einsatz">✎ Einsatzdaten</button>
+      <button class="btn small edit-only" data-action="close-einsatz">🔒 Einsatz abschließen</button>
+      <button class="btn small" data-action="export-current">⤒ Export</button>
+      <button class="btn small" data-action="print">🖶 Drucken</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nr.</th>
+            <th>Trupp</th>
+            <th>Personen <span class="th-sub">Anfangsdruck · Gerät/Flasche</span></th>
+            <th>Auftrag <span class="th-sub">Funk</span></th>
+            <th class="sep">Status</th>
+            <th class="time">Start</th>
+            <th class="time">1. Kontr.</th>
+            <th class="time">2. Kontr.</th>
+            <th class="time">Restzeit</th>
+            <th class="time">Ende <span class="th-sub">Dauer</span></th>
+            <th class="act"></th>
+          </tr>
+        </thead>
+        <tbody id="truppBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== Übersicht: laufende Überwachung ===== -->
+  <div id="viewDisplay" class="hidden">
+    <div class="display-head">
+      <div class="title" id="dispTitle"></div>
+      <button class="btn primary small no-print edit-only" data-action="new-trupp" id="dispNewTrupp">＋ Neuer Trupp</button>
+      <div class="big-clock" id="dispClock">--:--</div>
+    </div>
+    <div class="stats" id="dispStats"></div>
+    <h2 class="sec-head h-active">Im Einsatz</h2>
+    <div class="mgrid" id="dispActive"></div>
+    <h2 class="sec-head h-wait">Bereit</h2>
+    <ul class="mlist" id="dispReady"></ul>
+    <h2 class="sec-head h-done">Beendet</h2>
+    <ul class="mlist" id="dispDone"></ul>
+  </div>
+</main>
+
+<footer>V 1.04 | &copy; FF Haselbach[BR-AT]/Stefan Oberhumer (stefan@obssys.com) | <button type="button" class="linkbtn" data-action="haftung">Haftungsausschluss</button></footer>
+
+<!-- ===== Dialog: Einsatz ===== -->
+<dialog id="dlgEinsatz">
+  <form method="dialog" id="formEinsatz">
+    <div class="dhead" id="dlgEinsatzTitle">Neuer Einsatz</div>
+    <div class="dbody">
+      <label>Einsatz-Bezeichnung <span class="req" aria-hidden="true">*</span>
+        <input name="bezeichnung" required placeholder="z. B. Brand Lagerhalle Industriestraße 123" autocomplete="off">
+      </label>
+      <div class="row">
+        <label><span>Datum <span class="req" aria-hidden="true">*</span></span><input type="date" name="datum" required></label>
+        <label><span>Beginn <span class="req" aria-hidden="true">*</span></span><input type="time" name="beginn" required></label>
+      </div>
+      <label>Luftverbrauch für die Berechnung (Liter/Minute)
+        <input type="number" name="verbrauch" min="20" max="120" step="1" inputmode="numeric">
+      </label>
+    </div>
+    <div class="dfoot">
+      <span class="req-note"><span class="req">*</span> Pflichtfeld</span>
+      <button type="button" class="btn danger hidden" data-action="delete-einsatz" id="btnDelEinsatz">Löschen</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <button type="submit" class="btn primary">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Trupp anlegen/bearbeiten ===== -->
+<dialog id="dlgTrupp">
+  <form method="dialog" id="formTrupp">
+    <div class="dhead" id="dlgTruppTitle">Neuer Trupp</div>
+    <div class="dbody">
+      <fieldset>
+        <legend>Allgemein</legend>
+        <div class="row">
+          <label><span>Truppname <span class="req" aria-hidden="true">*</span></span><input name="name" required placeholder="z. B. Trupp 1" autocomplete="off"></label>
+          <label>Nummer <input type="text" name="nr" readonly tabindex="-1" class="readonly"></label>
+        </div>
+        <div class="field-title">Personen <span class="req" aria-hidden="true">*</span> <span class="sub">(mindestens ein Name; je Person Anfangsdruck und Gerät/Flasche)</span></div>
+        <div class="person-head"><span>Name</span><span>Feuerwehr</span><span>Druck (bar) <span class="req">*</span></span><span>Gerät/Flasche</span><span class="ed-h">Enddruck <span class="req">*</span></span><span></span></div>
+        <div id="personList"></div>
+        <button type="button" class="btn small" data-action="add-person">＋ Person hinzufügen</button>
+        <div class="calc" id="truppCalc"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Einsatz</legend>
+        <div class="row">
+          <label>Auftrag/Aufgabe <input name="auftrag" data-suggest="au" autocomplete="off" placeholder="z. B. Menschenrettung 1. OG"></label>
+          <label>Funkverbindung <input name="funk" data-suggest="fu" autocomplete="off" placeholder="z. B. Rufname/Kanal 7"></label>
+        </div>
+        <div class="times">
+          <div class="time-row">
+            <label>Startzeit <input type="time" step="1" name="start"></label>
+            <button type="button" class="btn" data-now="start">Jetzt</button>
+          </div>
+          <div class="time-row">
+            <label>Rückweg angetreten <input type="time" step="1" name="rueckweg"></label>
+            <button type="button" class="btn" data-now="rueckweg">Jetzt</button>
+          </div>
+          <div class="time-row">
+            <label>Endzeit <input type="time" step="1" name="ende"></label>
+            <button type="button" class="btn" data-now="ende">Jetzt</button>
+          </div>
+        </div>
+        <div class="notes-old" id="messOld">
+          <div class="field-title">Druckablesungen</div>
+          <ul class="notes-log" id="messLog"></ul>
+        </div>
+      </fieldset>
+      <div class="notes">
+        <label>Neue Notiz <textarea name="notiz" rows="2"></textarea></label>
+        <div class="notes-old">
+          <div class="field-title">Notizen</div>
+          <ul class="notes-log"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="dfoot">
+      <span class="req-note"><span class="req">*</span> Pflichtfeld</span>
+      <button type="button" class="btn danger hidden" data-action="delete-trupp" id="btnDelTrupp">Löschen</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <button type="submit" class="btn primary">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Start ===== -->
+<dialog id="dlgStart">
+  <form method="dialog" id="formStart">
+    <div class="dhead" id="dlgStartTitle">Start</div>
+    <div class="dbody">
+      <div class="time-row">
+        <label><span>Startzeit <span class="req" aria-hidden="true">*</span></span><input type="time" step="1" name="start" required></label>
+        <button type="button" class="btn" data-now="start">Jetzt</button>
+      </div>
+      <label>Auftrag/Aufgabe <input name="auftrag" data-suggest="au" autocomplete="off" placeholder="z. B. Menschenrettung 1. OG"></label>
+      <label>Funkverbindung <input name="funk" data-suggest="fu" autocomplete="off" placeholder="z. B. Rufname/Kanal 7"></label>
+      <div class="calc" id="startCalc"></div>
+      <div class="notes">
+        <label>Neue Notiz <textarea name="notiz" rows="2"></textarea></label>
+        <div class="notes-old">
+          <div class="field-title">Notizen</div>
+          <ul class="notes-log"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="dfoot">
+      <span class="req-note"><span class="req">*</span> Pflichtfeld</span>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <button type="submit" class="btn go">Start bestätigen</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Druckablesung ===== -->
+<dialog id="dlgDruck">
+  <form method="dialog" id="formDruck">
+    <div class="dhead" id="dlgDruckTitle">Druckablesung</div>
+    <div class="dbody">
+      <div class="row">
+        <label>Art
+          <select name="typ">
+            <option value="1">1. Druckkontrolle (nach ⅓)</option>
+            <option value="2">2. Druckkontrolle (nach ⅔)</option>
+            <option value="0">Zusätzliche Ablesung</option>
+          </select>
+        </label>
+        <div class="time-row">
+          <label><span>Uhrzeit <span class="req" aria-hidden="true">*</span></span><input type="time" step="1" name="at" required></label>
+          <button type="button" class="btn" data-now="at">Jetzt</button>
+        </div>
+      </div>
+      <div class="row">
+        <label><span>Niedrigster Druck (bar) <span class="req" aria-hidden="true">*</span></span><input type="number" name="bar" required min="0" max="350" step="1" inputmode="numeric"></label>
+      </div>
+      <div class="calc" id="druckCalc"></div>
+      <div class="notes">
+        <label>Neue Notiz <textarea name="notiz" rows="2"></textarea></label>
+        <div class="notes-old">
+          <div class="field-title">Notizen</div>
+          <ul class="notes-log"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="dfoot">
+      <span class="req-note"><span class="req">*</span> Pflichtfeld</span>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <button type="submit" class="btn wait">Druck speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: ½ Einsatzzeit – Rückweg ===== -->
+<dialog id="dlgRw">
+  <form method="dialog" id="formRw">
+    <div class="dhead" id="dlgRwTitle">½ Einsatzzeit – Rückweg</div>
+    <div class="dbody">
+      <div class="calc" id="rwInfo"></div>
+      <div id="rwDelayBox">
+        <div class="field-title">Alarm verschieben um</div>
+        <div class="rw-delay">
+          <button type="button" class="btn wait" data-rwdelay="1">+1 min</button>
+          <button type="button" class="btn wait" data-rwdelay="2">+2 min</button>
+          <button type="button" class="btn wait" data-rwdelay="3">+3 min</button>
+          <button type="button" class="btn wait" data-rwdelay="4">+4 min</button>
+          <button type="button" class="btn wait" data-rwdelay="5">+5 min</button>
+        </div>
+      </div>
+    </div>
+    <div class="dfoot">
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn go" id="btnRwAngetreten">↩ Rückweg angetreten</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Ende ===== -->
+<dialog id="dlgEnde">
+  <form method="dialog" id="formEnde">
+    <div class="dhead" id="dlgEndeTitle">Ende</div>
+    <div class="dbody">
+      <div class="time-row">
+        <label><span>Endzeit <span class="req" aria-hidden="true">*</span></span><input type="time" step="1" name="ende" required></label>
+        <button type="button" class="btn" data-now="ende">Jetzt</button>
+      </div>
+      <div class="field-title">Enddruck je Person (bar) <span class="req" aria-hidden="true">*</span></div>
+      <div class="end-list" id="endList"></div>
+      <div class="calc" id="endCalc"></div>
+      <div class="notes">
+        <label>Neue Notiz <textarea name="notiz" rows="2"></textarea></label>
+        <div class="notes-old">
+          <div class="field-title">Notizen</div>
+          <ul class="notes-log"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="dfoot">
+      <span class="req-note"><span class="req">*</span> Pflichtfeld</span>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <button type="submit" class="btn back">Ende bestätigen</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Löschen mit Export-Nachfrage ===== -->
+<dialog id="dlgDelete">
+  <form method="dialog">
+    <div class="dhead" id="dlgDeleteTitle">Löschen</div>
+    <div class="dbody" id="dlgDeleteText"></div>
+    <div class="dfoot">
+      <button type="button" class="btn" data-close>Abbrechen</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn danger" id="btnDelNoExport">Ohne Export löschen</button>
+      <button type="button" class="btn primary" id="btnDelExport">Exportieren &amp; löschen</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== Dialog: Haftungsausschluss ===== -->
+<dialog id="dlgHaftung">
+  <form method="dialog">
+    <div class="dhead">Haftungsausschluss</div>
+    <div class="dbody">
+      <p>Diese Werkzeuge sind <strong>Hilfsmittel</strong> und ersetzen weder die Atemschutzüberwachung nach den geltenden Vorschriften und Dienstanweisungen noch die Verantwortung der Einsatzkräfte. Alle Berechnungen sind Schätzungen auf Basis angenommener Verbrauchswerte. Der tatsächliche Verbrauch kann deutlich abweichen. Maßgeblich sind immer die abgelesenen Druckwerte und die Entscheidung vor Ort.</p>
+    </div>
+    <div class="dfoot">
+      <span class="spacer"></span>
+      <button type="button" class="btn primary" data-close>Verstanden</button>
+    </div>
+  </form>
+</dialog>
+
+<input type="file" id="fileImport" accept=".json,application/json" class="hidden">
+<div id="toast" class="hidden"></div>
+
+<script>
+"use strict";
+
+/* ================= Konstanten ================= */
+const STORAGE_KEY = "as-ueberwachung-v1";
+const SOUND_KEY = "as-ueberwachung-ton";
+const APP = "AS-Ueberwachung";
+const DEFAULT_VERBRAUCH = 50;   // Liter pro Minute
+const VORWARNUNG = 60;          // Sekunden vor Kontrolle/½ Einsatzzeit/Reserve gelb vorwarnen
+const BEEP_WIEDERHOLUNG = 20;   // Sekunden: Warnton wiederholen, solange ein Alarm ansteht
+// Flaschentypen: Volumen [l], Nenndruck [bar], plausibler Anfangsdruck ab [bar]
+const FLASCHEN = {
+  "6":   { l: 6,  max: 300, min: 270, txt: "6 l" },
+  "4":   { l: 4,  max: 200, min: 180, txt: "4 l" },
+  "2x6": { l: 12, max: 300, min: 270, txt: "2×6 l" }
+};
+const DEFAULT_FLASCHE = "6";
+// letzte Reserve: fließt nicht in die Berechnung der Einsatzzeit ein
+const RESERVE_BAR = 50;
+const MESS_TXT = { 1: "1. Kontrolle", 2: "2. Kontrolle", 0: "Ablesung" };
+const DEFAULT_NUM_PERSONS_TRUPP = 2; // Standard Personenanzahl pro Trupp
+const DEFAULT_SUGGEST_FW = []; // Standard-Feuerwehr-Vorschlagswerte
+//const DEFAULT_SUGGEST_FW = ['FF Aching','FF Braunau','FF Haselbach','FF Ranshofen']; // Abschnitt-Braunau
+
+/* ================= Speicher ================= */
+let state = { einsaetze: [], activeId: null };
+let view = "list";
+let filter = "alle";
+let soundOn = true;
+try { soundOn = localStorage.getItem(SOUND_KEY) !== "aus"; } catch (e) { console.error(e); }
+
+function migrate(e) {
+  e.trupps.forEach(t => {
+    t.personen = (t.personen || []).map(p => ({ ...p, pid: p.pid || uid() }));
+    t.messungen = t.messungen || [];
+    t.notizen = t.notizen || [];
+  });
+  return e;
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s && Array.isArray(s.einsaetze)) state = { einsaetze: s.einsaetze.map(migrate), activeId: s.activeId || null };
+    }
+  } catch (e) {
+    console.error(e);
+    toast("Gespeicherte Daten konnten nicht gelesen werden!");
+  }
+}
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error(e);
+    alert("ACHTUNG: Speichern im LocalStorage fehlgeschlagen!\nBitte Daten exportieren.");
+  }
+}
+// Änderungen aus anderem Tab/Fenster übernehmen (z. B. Übersicht auf zweitem Bildschirm)
+window.addEventListener("storage", e => {
+  if (e.key !== STORAGE_KEY) return;
+  const keepActive = state.activeId;
+  load();
+  if (keepActive && state.einsaetze.some(x => x.id === keepActive)) state.activeId = keepActive;
+  render();
+});
+
+/* ================= Hilfsfunktionen ================= */
+const $ = sel => document.querySelector(sel);
+const pad = n => String(n).padStart(2, "0");
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+const nowHM = () => { const d = new Date(); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+const todayISO = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Anzeige von Datum/Uhrzeit immer im Format der bevorzugten Browsersprache (erste Sprache der Liste)
+const LOCALE = (navigator.languages && navigator.languages[0]) || navigator.language || undefined;
+const fmtDate = iso => { if (!iso) return ""; const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString(LOCALE); };
+const fmtTime = hm => { if (!hm) return ""; const [h, m] = hm.split(":").map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d.toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" }); };
+const fmtStamp = iso => new Date(iso).toLocaleString(LOCALE, { dateStyle: "short", timeStyle: "short" });
+const touch = e => { e.modifiedAt = new Date().toISOString(); };
+
+// Intern wird mit Zeitstempeln in Sekunden gerechnet, angezeigt werden Minuten
+const nowSec = () => Math.floor(Date.now() / 1000);
+function secToHMS(sec) {
+  if (sec == null) return "";
+  const d = new Date(sec * 1000);
+  return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+}
+const nowHMS = () => secToHMS(nowSec());
+// Uhrzeit aus Eingabefeld → Zeitstempel; Tag so wählen, dass er möglichst nahe bei ref liegt (Einsatz über Mitternacht)
+function hmsToSec(hms, ref = nowSec()) {
+  if (!hms) return null;
+  const [h, m, s] = hms.split(":").map(Number);
+  const d = new Date(ref * 1000); d.setHours(h, m, s || 0, 0);
+  let x = Math.floor(d.getTime() / 1000);
+  if (x - ref > 43200) x -= 86400; else if (ref - x > 43200) x += 86400;
+  return x;
+}
+const fmtClock = sec => sec == null ? "" : new Date(sec * 1000).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
+// Dauer in Minuten; up = aufrunden (für Restzeiten/Countdowns)
+function fmtMin(sec, up) {
+  if (sec == null) return "";
+  const m = up ? Math.ceil(sec / 60) : Math.floor(sec / 60);
+  if (m < 60) return m + " min";
+  return Math.floor(m / 60) + ":" + pad(m % 60) + " h";
+}
+// Countdown bis zu einem kommenden Ereignis: unter einer Minute in Sekunden
+const fmtIn = sec => sec < 60 ? Math.max(0, sec) + " s" : fmtMin(sec, true);
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show"); t.classList.remove("hidden");
+  clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove("show"); t.classList.add("hidden") }, 3500);
+}
+
+/* ================= Trupp-Daten & Berechnung ================= */
+const current = () => state.einsaetze.find(e => e.id === state.activeId) || null;
+const status = t => t.ende ? "beendet" : t.start ? "einsatz" : "bereit";
+const STATUS_TXT = { bereit: "Bereit", einsatz: "Im Einsatz", beendet: "Beendet" };
+const truppLabel = t => t.name ? t.name : "Trupp " + t.nr;
+const personNames = t => (t.personen || []).map(p => p.name).filter(Boolean);
+const flasche = p => FLASCHEN[p.flasche] || FLASCHEN[DEFAULT_FLASCHE];
+// nutzbare Liter = Volumen × (Druck − Reserve)
+const nutzbar = (p, bar) => flasche(p).l * Math.max(0, bar - RESERVE_BAR);
+const verbrauch = e => e.verbrauch || DEFAULT_VERBRAUCH;
+const druckOk = p => p.druck >= flasche(p).min && p.druck <= flasche(p).max;
+const messSorted = t => [...(t.messungen || [])].sort((a, b) => a.at - b.at);
+const hasMess = (t, typ) => (t.messungen || []).some(m => m.typ === typ);
+const lastMessTyp = (t, typ) => messSorted(t).filter(m => m.typ === typ).pop();
+
+// maßgebliche Person = geringste nutzbare Literanzahl (bei gemischten Flaschen nicht unbedingt der niedrigste Druck)
+function critIdx(t) {
+  let best = -1;
+  (t.personen || []).forEach((p, i) => {
+    if (p.druck > 0 && (best < 0 || nutzbar(p, p.druck) < nutzbar(t.personen[best], t.personen[best].druck))) best = i;
+  });
+  return best;
+}
+// erwartete Gesamtdauer [s] nur aus dem Anfangsdruck
+function startDauer(e, t) {
+  const ci = critIdx(t);
+  return ci < 0 ? null : Math.round(nutzbar(t.personen[ci], t.personen[ci].druck) / (verbrauch(e) / 60));
+}
+// Erwartete Einsatzzeit ab Start, ausgehend vom Anfangsdruck bzw. der letzten Druckablesung.
+// Kontrollen nach ⅓ und ⅔, nach der Hälfte der (jeweils aktuellen) erwarteten Einsatzzeit spätestens Rückweg.
+// extra = hypothetische neue Ablesung (Vorschau im Druck-Dialog)
+function plan(e, t, extra) {
+  const ci = critIdx(t);
+  if (ci < 0 || !t.start) return null;
+  const ps = t.personen, lps = verbrauch(e) / 60;
+  const last = extra || messSorted(t).pop();
+  const crit = ps[ci], startL = nutzbar(crit, crit.druck);
+  let refVol = flasche(crit).l, refAt = t.start, refL = startL;
+  if (last) {
+    // Ablesung = niedrigster Druck im Trupp, von wem ist unbekannt → mit der kleinsten Flasche rechnen (ungünstigster Fall)
+    refVol = Math.min(...ps.filter(p => p.druck > 0).map(p => flasche(p).l));
+    refAt = last.at; refL = refVol * Math.max(0, last.bar - RESERVE_BAR);
+  }
+  const endAt = Math.round(refAt + refL / lps);
+  const total = endAt - t.start;
+  // Ist-Verbrauch aus Anfangsdruck der maßgeblichen Person und letzter Ablesung
+  const ist = last && refAt - t.start >= 60 ? (startL - refL) / ((refAt - t.start) / 60) : null;
+  return {
+    refVol, refAt, refL, lps, endAt, total, ist,
+    k1At: Math.round(t.start + total / 3), rwAt: Math.round(t.start + total / 2), k2At: Math.round(t.start + total * 2 / 3)
+  };
+}
+// Alarm „½ Einsatzzeit – Rückweg“: bei der Hälfte der Einsatzzeit, ggf. vom Atemschutz-Überwacher verschoben (t.rwBis)
+const rwFaellig = (t, p) => Math.max(p.rwAt, t.rwBis || 0);
+// rechnerischer aktueller (niedrigster) Druck im Trupp (inkl. Reserve)
+const estBar = (p, now) => Math.max(0, (p.refL - (now - p.refAt) * p.lps) / p.refVol + RESERVE_BAR);
+
+// Meldungen für einen Trupp im Einsatz: fällig = Alarm, kurz davor = Vorwarnung
+function alerts(e, t, now) {
+  const p = plan(e, t);
+  if (!p) return { p, level: "warn", items: [{ lvl: "warn", key: "nodata", txt: "Kein Anfangsdruck – keine Berechnung möglich" }], next: null };
+  const ev = [];
+  if (!hasMess(t, 1)) ev.push({ key: "k1", at: p.k1At, due: "1. Druckkontrolle fällig!", name: "1. Druckkontrolle" });
+  else if (!hasMess(t, 2)) ev.push({ key: "k2", at: p.k2At, due: "2. Druckkontrolle fällig!", name: "2. Druckkontrolle" });
+  if (!t.rueckweg) ev.push({ key: "rw", at: rwFaellig(t, p), due: "½ Einsatzzeit – Rückweg erreicht!", name: "½ Einsatzzeit – Rückweg" + (t.rwBis > p.rwAt ? " (verschoben)" : "") });
+  ev.push({ key: "end", at: p.endAt, due: `Reserve (${RESERVE_BAR} bar) rechnerisch erreicht!`, name: "Reserve erreicht" });
+  const items = [];
+  ev.forEach(x => {
+    if (now >= x.at) items.push({ lvl: "alarm", key: x.key, txt: "⚠ " + x.due });
+    else if (x.at - now <= VORWARNUNG) items.push({ lvl: "warn", key: x.key, txt: `${x.name} in ${fmtIn(x.at - now)}` });
+  });
+  if (t.rueckweg) items.push({ lvl: "info", key: "rwinfo", txt: `↩ Rückweg angetreten ${fmtClock(t.rueckweg)}` });
+  const nx = ev.filter(x => x.at > now && !items.some(i => i.key === x.key)).sort((a, b) => a.at - b.at)[0];
+  const level = items.some(i => i.lvl === "alarm") ? "alarm" : items.some(i => i.lvl === "warn") ? "warn" : "";
+  return { p, level, items, next: nx ? `Nächstes: ${nx.name} um ${fmtClock(nx.at)} (in ${fmtIn(nx.at - now)})` : null };
+}
+
+/* ================= Warnton ================= */
+let audioCtx = null;
+function audio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) { console.error(e); }
+  return audioCtx;
+}
+// Browser erlauben Ton erst nach einer Benutzeraktion → beim ersten Antippen freischalten
+document.addEventListener("pointerdown", () => { if (soundOn) audio(); }, { once: true });
+function beep() {
+  if (!soundOn) return;
+  const ctx = audio();
+  if (!ctx) return;
+  try {
+    [0, .3, .6].forEach(d => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+      const t0 = ctx.currentTime + d;
+      g.gain.setValueAtTime(.25, t0); g.gain.setValueAtTime(0, t0 + .18);
+      o.start(t0); o.stop(t0 + .2);
+    });
+  } catch (e) { console.error(e); }
+}
+
+/* ================= Rendering ================= */
+function render() {
+  const e = current();
+  if (!e && view !== "list") view = "list";
+  document.body.classList.toggle("is-closed", !!(e && e.closedAt));
+  $("#viewList").classList.toggle("hidden", view !== "list");
+  $("#viewEinsatz").classList.toggle("hidden", view !== "einsatz");
+  $("#viewDisplay").classList.toggle("hidden", view !== "display");
+  // Tabelle/Übersicht wechseln sich ab: nur den Button zur jeweils anderen Ansicht zeigen
+  $("#btnViewEinsatz").classList.toggle("hidden", !e || view === "einsatz");
+  $("#btnViewDisplay").classList.toggle("hidden", !e || view === "display");
+  $("#btnSound").textContent = soundOn ? "🔔" : "🔕";
+  $("#hdrInfo").textContent = e ? `${e.bezeichnung} · ${fmtDate(e.datum)} · Beginn ${fmtTime(e.beginn)} · ${verbrauch(e)} l/min` : "Kein Einsatz gewählt";
+  document.title = e ? `AS-Überwachung – ${e.bezeichnung}` : "AS-Überwachung";
+  if (view === "list") renderList();
+  if (view === "einsatz") renderTable(e);
+  if (view === "display") renderDisplay(e);
+  updateLive();
+}
+
+function exportInfo(e) {
+  if (!e.exportedAt) return `<div class="meta export-info stale">Noch nie exportiert</div>`;
+  const stale = e.modifiedAt && e.modifiedAt > e.exportedAt;
+  return `<div class="meta export-info ${stale ? "stale" : ""}">Exportiert ${fmtStamp(e.exportedAt)}${stale ? " – seither geändert" : ""}</div>`;
+}
+function einsatzCard(e) {
+  const counts = { bereit: 0, einsatz: 0, beendet: 0 };
+  e.trupps.forEach(t => counts[status(t)]++);
+  return `<div class="card ${e.id === state.activeId ? "current" : ""} ${e.closedAt ? "closed" : ""}">
+    <h3>${esc(e.bezeichnung)}<span class="tag ${e.closedAt ? "closed" : "open"}">${e.closedAt ? "🔒 Abgeschlossen" : "Aktiv"}</span></h3>
+    <div class="meta">${fmtDate(e.datum)} · Beginn ${esc(fmtTime(e.beginn))}${e.closedAt ? ` · Abgeschlossen ${fmtStamp(e.closedAt)}` : ""}</div>
+    <div class="meta">${e.trupps.length} Trupps – ${counts.bereit} bereit, ${counts.einsatz} im Einsatz, ${counts.beendet} beendet</div>
+    ${exportInfo(e)}
+    <div class="actions">
+      <button class="btn primary" data-action="open-einsatz" data-id="${e.id}">Öffnen</button>
+      <button class="btn small" data-action="export-one" data-id="${e.id}">⤒ Export</button>
+      <button class="btn small danger" data-action="delete-einsatz" data-id="${e.id}">🗑 Löschen</button>
+    </div>
+  </div>`;
+}
+function renderList() {
+  const byDate = (a, b) => (b.datum + b.beginn).localeCompare(a.datum + a.beginn);
+  const aktiv = state.einsaetze.filter(e => !e.closedAt).sort(byDate);
+  const closed = state.einsaetze.filter(e => e.closedAt).sort(byDate);
+  let html = "";
+  if (aktiv.length) html += `<div class="list-head">Aktive Einsätze</div><div class="cards">${aktiv.map(einsatzCard).join("")}</div>`;
+  if (closed.length) html += `<div class="list-head">Abgeschlossene Einsätze</div><div class="cards">${closed.map(einsatzCard).join("")}</div>`;
+  $("#einsatzCards").innerHTML = html || `<div class="empty">Noch keine Einsätze vorhanden.<br>Lege mit „Neuer Einsatz“ einen an oder importiere eine Datei.</div>`;
+}
+
+function renderStats(e, el) {
+  const c = { bereit: 0, einsatz: 0, beendet: 0 }, p = { bereit: 0, einsatz: 0, beendet: 0 };
+  e.trupps.forEach(t => { const s = status(t); c[s]++; p[s] += personNames(t).length; });
+  el.innerHTML = `
+    <div class="stat active"><div class="val">${c.einsatz}</div><div class="lbl">Trupps im Einsatz (${p.einsatz} Pers.)</div></div>
+    <div class="stat alarm"><div class="val" data-live="alarmcount">0</div><div class="lbl">Trupps mit Alarm</div></div>
+    <div class="stat wait"><div class="val">${c.bereit}</div><div class="lbl">Trupps bereit (${p.bereit} Pers.)</div></div>
+    <div class="stat done"><div class="val">${c.beendet}</div><div class="lbl">Trupps beendet (${p.beendet} Pers.)</div></div>`;
+}
+// Anfangsdruck, nach dem Ende mit Enddruck („300 → 120 bar“)
+const drTxt = p => p.enddruck != null ? `${p.druck || "?"} → ${p.enddruck} bar` : `${p.druck || "?"} bar`;
+// Personen mit Anfangsdruck und Gerät/Flasche; maßgebliche Person markiert (▼)
+function personsHtml(t, sep) {
+  const ci = critIdx(t);
+  return (t.personen || []).map((p, i) => p.name
+    ? `<span class="${i === ci ? "crit" : ""}">${esc(p.name)} <span class="sub">${drTxt(p)} · ${flasche(p).txt}</span></span>` : "")
+    .filter(Boolean).join(sep);
+}
+// nur im Ausdruck: alle Druckablesungen des Trupps als eigene Zeile unter dem Trupp
+function messPrintRow(t) {
+  const ms = messSorted(t);
+  if (!ms.length) return "";
+  return `<tr class="print-only mess-row"><td></td><td colspan="10"><b>Druckablesungen:</b> ${ms.map(m =>
+    `${esc(new Date(m.at * 1000).toLocaleTimeString(LOCALE))} ${MESS_TXT[m.typ]}: <b>${m.bar} bar</b>`).join(" · ")}</td></tr>`;
+}
+const messCell = m => m ? `${esc(fmtClock(m.at))}<br><b>${m.bar} bar</b>` : "";
+
+function renderTable(e) {
+  $("#closedBanner").classList.toggle("hidden", !e.closedAt);
+  $("#closedBanner").textContent = e.closedAt ? `🔒 Dieser Einsatz wurde am ${fmtStamp(e.closedAt)} abgeschlossen – keine Änderungen mehr möglich.` : "";
+  renderStats(e, $("#stats"));
+  document.querySelectorAll("#filterChips .chip").forEach(c => c.setAttribute("aria-pressed", c.dataset.filter === filter));
+  const order = { einsatz: 0, bereit: 1, beendet: 2 };
+  const rows = e.trupps
+    .filter(t => filter === "alle" || status(t) === filter)
+    .sort((a, b) => order[status(a)] - order[status(b)] || a.nr - b.nr);
+  if (!rows.length) {
+    $("#truppBody").innerHTML = `<tr><td colspan="11" class="empty">${e.trupps.length ? "Keine Trupps in diesem Filter." : "Noch keine Trupps angelegt."}</td></tr>`;
+    return;
+  }
+  $("#truppBody").innerHTML = rows.map(t => {
+    const s = status(t);
+    let act = "", dur = "", rest = "";
+    if (s === "bereit") {
+      act = `<button class="btn go small" data-action="start" data-id="${t.id}">▶ Start</button>`;
+      const d = startDauer(current(), t);
+      if (d) rest = `<span class="sub" title="erwartete Einsatzzeit">(${fmtMin(d)})</span>`;
+    }
+    if (s === "einsatz") {
+      act = `<button class="btn wait small" data-action="druck" data-id="${t.id}">⊙ Druck</button>` +
+        (t.rueckweg ? "" : `<button class="btn go small" data-action="rueckweg" data-id="${t.id}">½ Einsatzzeit</button>`) +
+        `<button class="btn back small" data-action="ende" data-id="${t.id}">■ Ende</button>`;
+      dur = `<span class="dur" data-live="elapsed"></span>`;
+      rest = `<span class="dur" data-live="rest"></span>`;
+    }
+    if (s === "beendet") dur = `<span class="sub">${fmtMin(t.ende - t.start)}</span>`;
+    return `<tr class="s-${s}" data-tid="${t.id}" data-action="edit-trupp" data-id="${t.id}">
+      <td class="nr">${t.nr}</td>
+      <td><div class="trupp-name">${esc(truppLabel(t))}</div>${(t.notizen || []).map(n => `<div class="sub">${n.at ? esc(new Date(n.at).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" })) + " " : ""}${esc(n.text)}</div>`).join("")}</td>
+      <td class="personen">${(t.personen || []).filter(p => p.name).map(p =>
+        `<div>${esc(p.name)}${p.fw ? ` <span class="sub">(${esc(p.fw)})</span>` : ""} <span class="sub"><b>${drTxt(p)}</b> · ${flasche(p).txt}</span></div>`).join("")}</td>
+      <td>${esc(t.auftrag || "")}${t.funk ? `<div class="sub">📻 ${esc(t.funk)}</div>` : ""}</td>
+      <td class="sep" data-live="tstatus"><span class="badge ${s}">${STATUS_TXT[s]}</span></td>
+      <td class="time">${esc(fmtClock(t.start))}</td>
+      <td class="time">${messCell(lastMessTyp(t, 1))}</td>
+      <td class="time">${messCell(lastMessTyp(t, 2))}</td>
+      <td class="time">${rest}</td>
+      <td class="time">${t.ende ? esc(fmtClock(t.ende)) + "<br>" : ""}${dur}</td>
+      <td class="act">${act ? `<div>${act}</div>` : ""}</td>
+    </tr>${messPrintRow(t)}`;
+  }).join("");
+}
+
+function monCard(t) {
+  const ms = messSorted(t);
+  return `<div class="mcard" data-tid="${t.id}" data-action="edit-trupp" data-id="${t.id}">
+    <div class="mhead"><div class="t">${esc(truppLabel(t))} <span class="sub">#${t.nr}</span></div><div class="elapsed" data-live="elapsed"></div></div>
+    <div class="mmeta">${t.auftrag ? esc(t.auftrag) : "– kein Auftrag –"}${t.funk ? " · 📻 " + esc(t.funk) : ""} · Start ${esc(fmtClock(t.start))}</div>
+    <div class="mpers">${personsHtml(t, "")}</div>
+    ${ms.length ? `<div class="mmess">${ms.map(m => `<span>${MESS_TXT[m.typ]} ${esc(fmtClock(m.at))}: <b>${m.bar} bar</b></span>`).join("")}</div>` : ""}
+    <div class="pbar"><div class="fill" data-live="fill"></div><i style="left:33.33%"></i><i class="half" style="left:50%"></i><i style="left:66.67%"></i></div>
+    <div class="pbar-lbl"><span style="left:33.33%">K1</span><span style="left:50%">½ – Rückweg</span><span style="left:66.67%">K2</span></div>
+    <div class="mnums">
+      <div><span class="lbl">Restzeit</span><b data-live="rest">–</b></div>
+      <div><span class="lbl">Druck (berechnet)</span><b data-live="bar">–</b></div>
+      <div><span class="lbl">Reserve ab ca.</span><b data-live="end">–</b></div>
+    </div>
+    <div class="malerts" data-live="alerts"></div>
+    <div class="mact edit-only">
+      <button class="btn wait small" data-action="druck" data-id="${t.id}">⊙ Druck melden</button>
+      ${t.rueckweg ? "" : `<button class="btn go small" data-action="rueckweg" data-id="${t.id}">½ Einsatzzeit</button>`}
+      <button class="btn back small" data-action="ende" data-id="${t.id}">■ Ende</button>
+    </div>
+  </div>`;
+}
+function renderDisplay(e) {
+  $("#dispTitle").textContent = `${e.bezeichnung} · ${fmtDate(e.datum)}`;
+  renderStats(e, $("#dispStats"));
+  const act = e.trupps.filter(t => status(t) === "einsatz").sort((a, b) => a.start - b.start);
+  $("#dispActive").innerHTML = act.length ? act.map(monCard).join("") : `<div class="empty">Kein Trupp im Einsatz</div>`;
+  const ready = e.trupps.filter(t => status(t) === "bereit").sort((a, b) => a.nr - b.nr);
+  $("#dispReady").innerHTML = ready.length ? ready.map(t => {
+    const d = startDauer(e, t);
+    return `<li data-action="edit-trupp" data-id="${t.id}">
+      <div class="main"><div class="t">${esc(truppLabel(t))} <span class="sub">#${t.nr}</span></div>
+        <div class="sub">${personsHtml(t, " · ")}</div></div>
+      <div class="right">${d ? `Einsatzzeit ca. <b>${fmtMin(d)}</b>` : `<span class="badge warn">kein Druck erfasst</span>`}</div>
+      <button class="btn go small edit-only" data-action="start" data-id="${t.id}">▶ Start</button>
+    </li>`;
+  }).join("") : `<li class="empty">Kein Trupp bereit</li>`;
+  const done = e.trupps.filter(t => status(t) === "beendet").sort((a, b) => b.ende - a.ende);
+  $("#dispDone").innerHTML = done.length ? done.map(t => {
+    const last = messSorted(t).pop();
+    return `<li data-action="edit-trupp" data-id="${t.id}">
+      <div class="main"><div class="t">${esc(truppLabel(t))} <span class="sub">#${t.nr}</span></div>
+        <div class="sub">${esc(t.auftrag || "")}${last ? ` · letzte Ablesung ${last.bar} bar` : ""}</div>
+        <div class="sub">${personsHtml(t, " · ")}</div></div>
+      <div class="right">${esc(fmtClock(t.start))} – ${esc(fmtClock(t.ende))}<div class="sub">${fmtMin(t.ende - t.start)}</div></div>
+    </li>`;
+  }).join("") : `<li class="empty">Noch kein Trupp beendet</li>`;
+}
+
+/* ================= Laufende Überwachung (jede Sekunde) ================= */
+// Nur Texte/Klassen aktualisieren statt neu zu rendern, damit Buttons beim Antippen nicht ersetzt werden
+let liveSeen = new Set(), lastBeep = 0;
+function updateLive() {
+  const e = current();
+  const now = nowSec();
+  const fresh = new Map();
+  let nAlarm = 0;
+  if (e) e.trupps.filter(t => status(t) === "einsatz").forEach(t => {
+    const a = alerts(e, t, now);
+    if (a.level === "alarm") nAlarm++;
+    a.items.filter(i => i.lvl === "alarm").forEach(i => fresh.set(t.id + ":" + i.key, `${truppLabel(t)}: ${i.txt}`));
+    const alertHtml = a.items.map(i => `<div class="al ${i.lvl}">${esc(i.txt)}</div>`).join("") + (a.next ? `<div class="al next">${esc(a.next)}</div>` : "");
+    const top = a.items.find(i => i.lvl !== "info");
+    const statusHtml = `<span class="badge einsatz">Im Einsatz</span>${t.rueckweg ? `<br><span class="badge rueckweg">↩ am Rückweg seit ${esc(fmtClock(t.rueckweg))}</span>` : ""}${top ? `<br><span class="badge ${top.lvl}">${esc(top.txt)}</span>` : ""}`;
+    document.querySelectorAll(`[data-tid="${t.id}"]`).forEach(box => {
+      box.classList.toggle("lv-alarm", a.level === "alarm");
+      box.classList.toggle("lv-warn", a.level === "warn");
+      const set = (k, fn) => box.querySelectorAll(`[data-live="${k}"]`).forEach(fn);
+      const html = (el, h) => { if (el._h !== h) { el.innerHTML = h; el._h = h; } };
+      set("elapsed", el => { el.textContent = "⏱ " + fmtMin(now - t.start); });
+      set("alerts", el => html(el, alertHtml));
+      set("tstatus", el => html(el, statusHtml));
+      if (!a.p) return;
+      set("fill", el => { el.style.width = Math.min(100, Math.max(0, (now - t.start) / a.p.total * 100)) + "%"; });
+      set("rest", el => { el.textContent = fmtIn(a.p.endAt - now); });
+      set("bar", el => { el.textContent = "≈ " + Math.round(estBar(a.p, now)) + " bar"; });
+      set("end", el => { el.textContent = fmtClock(a.p.endAt); });
+    });
+  });
+  document.querySelectorAll('[data-live="alarmcount"]').forEach(el => { el.textContent = nAlarm; });
+  // neu aufgetretene Alarme: Ton + Hinweis; solange Alarme anstehen, Ton alle BEEP_WIEDERHOLUNG Sekunden
+  const neu = [...fresh.keys()].filter(k => !liveSeen.has(k));
+  if (fresh.size && e && !e.closedAt) {
+    if (neu.length) toast(fresh.get(neu[0]));
+    if (neu.length || now - lastBeep >= BEEP_WIEDERHOLUNG) { beep(); lastBeep = now; }
+  }
+  liveSeen = new Set(fresh.keys());
+}
+
+/* ================= Selbstlernende Vorschlagslisten ================= */
+// Eigene Umsetzung statt <datalist>, damit die Suche in allen Browsern/Tablets gleich funktioniert:
+// Treffer = Eingabe kommt irgendwo im Wert vor (Groß/Klein egal), Treffer am Wortanfang zuerst.
+const SUGGEST_FIELDS = {
+  pn: { trupp: t => (t.personen || []).map(p => p.name), live: null },
+  fw: { trupp: t => (t.personen || []).map(p => p.fw), live: ".fw" },
+  au: { trupp: t => [t.auftrag], live: '[name="auftrag"]' },
+  fu: { trupp: t => [t.funk], live: '[name="funk"]' }
+};
+function suggestOptions(input) {
+  const kind = SUGGEST_FIELDS[input.dataset.suggest];
+  const set = new Set();
+  if (input.dataset.suggest == 'fw' && DEFAULT_SUGGEST_FW) {
+    DEFAULT_SUGGEST_FW.forEach(fw => { if (fw) set.add(fw); });
+  }
+  const e = current();
+  (e ? e.trupps : []).forEach(t => kind.trupp(t).forEach(v => { v = (v || "").trim(); if (v) set.add(v); }));
+  // schon während der Eingabe lernen: Werte aus den anderen Feldern des offenen Dialogs
+  const dlg = input.closest("dialog");
+  if (kind.live && dlg) dlg.querySelectorAll(kind.live).forEach(i => { const v = i.value.trim(); if (v && i !== input) set.add(v); });
+  return [...set];
+}
+
+const suggestBox = document.createElement("ul");
+suggestBox.className = "suggest hidden";
+let suggestInput = null, suggestIdx = -1;
+
+function suggestShow(input) {
+  const q = input.value.trim().toLowerCase();
+  const hits = suggestOptions(input)
+    .filter(v => v.toLowerCase() !== q && v.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const pa = a.toLowerCase().startsWith(q) ? 0 : 1, pb = b.toLowerCase().startsWith(q) ? 0 : 1;
+      return pa - pb || a.localeCompare(b, LOCALE);
+    });
+  suggestInput = input; suggestIdx = -1;
+  if (!hits.length) { suggestHide(); return; }
+  suggestBox.innerHTML = hits.map(v => `<li data-value="${esc(v)}">${esc(v)}</li>`).join("");
+  // in den Dialog hängen (Top-Layer), sonst läge die Liste hinter dem Dialog
+  (input.closest("dialog") || document.body).append(suggestBox);
+  suggestBox.classList.remove("hidden");
+  suggestPlace();
+}
+function suggestPlace() {
+  if (!suggestInput || suggestBox.classList.contains("hidden")) return;
+  const r = suggestInput.getBoundingClientRect();
+  const below = window.innerHeight - r.bottom, above = r.top;
+  suggestBox.style.left = r.left + "px";
+  suggestBox.style.width = r.width + "px";
+  if (below < 180 && above > below) {
+    suggestBox.style.top = ""; suggestBox.style.bottom = (window.innerHeight - r.top + 2) + "px";
+    suggestBox.style.maxHeight = Math.min(260, above - 8) + "px";
+  } else {
+    suggestBox.style.bottom = ""; suggestBox.style.top = (r.bottom + 2) + "px";
+    suggestBox.style.maxHeight = Math.min(260, below - 8) + "px";
+  }
+}
+function suggestHide() { suggestBox.classList.add("hidden"); suggestInput = null; suggestIdx = -1; }
+function suggestPick(value) {
+  const input = suggestInput;
+  input.value = value;
+  suggestHide();
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+document.addEventListener("focusin", ev => { if (ev.target.dataset && ev.target.dataset.suggest) suggestShow(ev.target); });
+document.addEventListener("input", ev => { if (ev.target.dataset && ev.target.dataset.suggest) suggestShow(ev.target); });
+document.addEventListener("focusout", ev => { if (ev.target === suggestInput) suggestHide(); });
+document.addEventListener("scroll", suggestPlace, true);
+window.addEventListener("resize", suggestPlace);
+// pointerdown + preventDefault: Fokus bleibt im Feld, Auswahl funktioniert mit Finger und Maus
+suggestBox.addEventListener("pointerdown", ev => {
+  const li = ev.target.closest("li");
+  ev.preventDefault();
+  if (li) suggestPick(li.dataset.value);
+});
+document.addEventListener("keydown", ev => {
+  if (!suggestInput || ev.target !== suggestInput || suggestBox.classList.contains("hidden")) return;
+  const items = [...suggestBox.children];
+  if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+    ev.preventDefault();
+    suggestIdx = (suggestIdx + (ev.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items.forEach((li, i) => li.classList.toggle("active", i === suggestIdx));
+    items[suggestIdx].scrollIntoView({ block: "nearest" });
+  } else if (ev.key === "Enter" && suggestIdx >= 0) {
+    ev.preventDefault(); suggestPick(items[suggestIdx].dataset.value);
+  } else if (ev.key === "Escape") {
+    ev.preventDefault(); ev.stopPropagation(); suggestHide();
+  }
+});
+
+function tick() {
+  const d = new Date();
+  $("#clock").textContent = d.toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
+  $("#dispClock").textContent = d.toLocaleTimeString(LOCALE);
+  updateLive();
+}
+
+/* ================= Eingaben trimmen ================= */
+const isTextField = el => el.matches('textarea, input:not([type]), input[type="text"], input[type="search"]');
+// beim Verlassen eines Feldes sichtbar trimmen
+document.addEventListener("change", ev => { if (isTextField(ev.target)) ev.target.value = ev.target.value.trim(); }, true);
+// vor jedem Speichern alle Textfelder trimmen; Pflichtfelder, die nur aus Leerzeichen bestanden, abweisen
+document.addEventListener("submit", ev => {
+  const fields = [...ev.target.elements].filter(isTextField);
+  fields.forEach(el => { el.value = el.value.trim(); });
+  const empty = fields.find(el => el.required && !el.value);
+  if (empty) { ev.preventDefault(); ev.stopPropagation(); empty.reportValidity(); }
+}, true);
+
+/* ================= Notiz-Verlauf ================= */
+function renderNotesLog(dlg, t) {
+  const list = (t && t.notizen) || [];
+  const box = dlg.querySelector(".notes .notes-old");
+  // ohne Einträge den ganzen Bereich "Notizen" ausblenden
+  box.classList.toggle("hidden", !list.length);
+  box.querySelector(".notes-log").innerHTML = list
+    .map(n => `<li><span class="at">${n.at ? esc(fmtStamp(n.at)) : "–"}</span><span>${esc(n.text)}</span></li>`).join("");
+  dlg.querySelector('[name="notiz"]').value = "";
+}
+// neuen Eintrag nur anhängen, wenn tatsächlich etwas eingegeben wurde
+function addNote(notizen, text) {
+  text = text.trim();
+  return text ? [...(notizen || []), { at: new Date().toISOString(), text }] : (notizen || []);
+}
+
+/* ================= Dialoge ================= */
+let editTruppId = null, actionTruppId = null, editEinsatzId = null;
+
+function openDialog(dlg) { dlg.showModal(); }
+document.querySelectorAll("dialog").forEach(dlg => {
+  dlg.addEventListener("click", ev => {
+    if (ev.target.closest("[data-close]")) dlg.close();
+    const nowBtn = ev.target.closest("[data-now]");
+    if (nowBtn) {
+      const input = dlg.querySelector(`[name="${nowBtn.dataset.now}"]`);
+      input.value = nowHMS();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  });
+});
+const truppById = id => { const e = current(); return e ? e.trupps.find(x => x.id === id) : null; };
+
+// --- Einsatz ---
+function showEinsatzDialog(e) {
+  const f = $("#formEinsatz");
+  editEinsatzId = e ? e.id : null;
+  $("#dlgEinsatzTitle").textContent = e ? "Einsatzdaten bearbeiten" : "Neuer Einsatz";
+  f.bezeichnung.value = e ? e.bezeichnung : "";
+  f.datum.value = e ? e.datum : todayISO();
+  f.beginn.value = e ? e.beginn : nowHM();
+  f.verbrauch.value = e ? verbrauch(e) : DEFAULT_VERBRAUCH;
+  $("#btnDelEinsatz").classList.toggle("hidden", !e);
+  openDialog($("#dlgEinsatz"));
+}
+$("#formEinsatz").addEventListener("submit", () => {
+  const f = $("#formEinsatz");
+  const data = {
+    bezeichnung: f.bezeichnung.value.trim(), datum: f.datum.value, beginn: f.beginn.value,
+    verbrauch: parseInt(f.verbrauch.value, 10) || DEFAULT_VERBRAUCH
+  };
+  if (editEinsatzId) {
+    const e = state.einsaetze.find(x => x.id === editEinsatzId);
+    if (e.closedAt) return;
+    Object.assign(e, data); touch(e);
+  } else {
+    const e = { id: uid(), ...data, trupps: [], modifiedAt: new Date().toISOString() };
+    state.einsaetze.push(e);
+    state.activeId = e.id;
+    view = "display";
+  }
+  save(); render();
+});
+
+// --- Trupp ---
+function personRow(p = {}) {
+  const div = document.createElement("div");
+  div.className = "person-row";
+  div.dataset.pid = p.pid || uid();
+  const fl = p.flasche || DEFAULT_FLASCHE;
+  div.innerHTML = `
+    <input class="pn" placeholder="Name Person" data-suggest="pn" value="${esc(p.name || "")}" autocomplete="off">
+    <input class="fw" placeholder="Feuerwehr" data-suggest="fw" value="${esc(p.fw || "")}" autocomplete="off">
+    <input class="dr" type="number" min="1" max="350" step="1" inputmode="numeric" placeholder="bar" aria-label="Anfangsdruck (bar)" value="${p.druck || ""}">
+    <select class="fl" aria-label="Gerät/Flasche">${Object.entries(FLASCHEN).map(([k, f]) => `<option value="${k}" ${k === fl ? "selected" : ""}>${f.txt} / ${f.max} bar</option>`).join("")}</select>
+    <input class="ed" type="number" min="0" max="350" step="1" inputmode="numeric" placeholder="Ende bar" aria-label="Enddruck (bar)" value="${p.enddruck ?? ""}">
+    <button type="button" class="rm" title="Person entfernen" aria-label="Person entfernen">×</button>`;
+  div.querySelector(".rm").onclick = () => { div.remove(); truppCalcUpdate(); };
+  checkRow(div);
+  return div;
+}
+const rowPerson = r => ({
+  pid: r.dataset.pid, name: r.querySelector(".pn").value.trim(), fw: r.querySelector(".fw").value.trim(),
+  flasche: r.querySelector(".fl").value, druck: parseInt(r.querySelector(".dr").value, 10) || null,
+  enddruck: barVal(r.querySelector(".ed").value)
+});
+// leeres Feld → null; 0 bar ist ein gültiger Wert
+const barVal = v => (v = parseInt(v, 10), Number.isNaN(v) ? null : v);
+// Enddruck: Pflicht je Person und nie höher als der Anfangsdruck → erste fehlerhafte Person oder null
+function enddruckFehler(personen) {
+  for (const p of personen) {
+    if (p.enddruck == null || p.enddruck < 0) return { p, msg: `Bitte den Enddruck für „${p.name}“ eingeben.` };
+    if (p.druck && p.enddruck > p.druck) return { p, msg: `Der Enddruck von „${p.name}“ (${p.enddruck} bar) kann nicht höher sein als der Anfangsdruck (${p.druck} bar).\nBitte Eingabe prüfen.` };
+  }
+  return null;
+}
+const readPersons = () => [...document.querySelectorAll("#personList .person-row")].map(rowPerson).filter(p => p.name);
+// unplausiblen Anfangsdruck sofort markieren
+function checkRow(r) {
+  const p = rowPerson(r), dr = r.querySelector(".dr"), f = flasche(p);
+  const bad = p.druck != null && !druckOk(p);
+  dr.classList.toggle("warn-input", bad);
+  dr.title = bad ? `Ungewöhnlicher Anfangsdruck – erwartet ${f.min}–${f.max} bar` : "";
+}
+function truppCalcUpdate() {
+  const e = current();
+  const t = { personen: readPersons() };
+  const ci = critIdx(t);
+  if (ci < 0) { $("#truppCalc").innerHTML = ""; return; }
+  const p = t.personen[ci], d = startDauer(e, t);
+  const odd = t.personen.filter(x => x.druck && !druckOk(x));
+  $("#truppCalc").innerHTML = `
+    <div>Maßgeblich: <b>${esc(p.name)}</b> (${flasche(p).txt} · ${p.druck} bar → ${nutzbar(p, p.druck)} l nutzbar, ohne ${RESERVE_BAR} bar Reserve)</div>
+    <div>Erwartete Einsatzzeit: <b>${fmtMin(d)}</b> bei ${verbrauch(e)} l/min · Kontrollen nach ${fmtMin(d / 3)} und ${fmtMin(d * 2 / 3)} · ½ Einsatzzeit – Rückweg nach ${fmtMin(d / 2)}</div>
+    ${odd.length ? `<div class="hintbox">⚠ Ungewöhnlicher Anfangsdruck: ${odd.map(x => `${esc(x.name)} ${x.druck} bar (erwartet ${flasche(x).min}–${flasche(x).max})`).join(", ")}</div>` : ""}`;
+}
+$("#formTrupp").addEventListener("input", ev => {
+  $("#dlgTrupp").classList.toggle("with-ende", !!$("#formTrupp").ende.value);
+  const r = ev.target.closest(".person-row");
+  if (r) checkRow(r);
+  truppCalcUpdate();
+});
+$("#formTrupp").addEventListener("change", ev => {
+  $("#dlgTrupp").classList.toggle("with-ende", !!$("#formTrupp").ende.value);
+  const r = ev.target.closest(".person-row");
+  if (r) checkRow(r);
+  truppCalcUpdate();
+});
+$("#dlgTrupp").addEventListener("click", ev => {
+  if (ev.target.closest('[data-action="add-person"]')) {
+    // Feuerwehr und Gerät/Flasche der letzten Person vorbelegen
+    const rows = [...document.querySelectorAll("#personList .person-row")];
+    const last = rows.length ? rowPerson(rows[rows.length - 1]) : {};
+    const row = personRow({ fw: last.fw || "", flasche: last.flasche });
+    $("#personList").append(row);
+    row.querySelector(".pn").focus();
+  }
+  const del = ev.target.closest("[data-delmess]");
+  if (del && confirm("Diese Druckablesung löschen?")) {
+    editMess.splice(Number(del.dataset.delmess), 1);
+    renderMessLog();
+  }
+});
+
+let editMess = [];
+function renderMessLog() {
+  $("#messOld").classList.toggle("hidden", !editMess.length);
+  $("#messLog").innerHTML = editMess.map((m, i) => `<li>
+      <span class="at">${esc(fmtClock(m.at))}</span>
+      <span class="grow">${MESS_TXT[m.typ]}: <b>${m.bar} bar</b></span>
+      <button type="button" class="rm-mess" data-delmess="${i}" title="Ablesung löschen" aria-label="Ablesung löschen">×</button>
+    </li>`).join("");
+}
+
+function showTruppDialog(t) {
+  const e = current();
+  const f = $("#formTrupp");
+  editTruppId = t ? t.id : null;
+  $("#dlgTruppTitle").textContent = t ? `Trupp ${t.nr} bearbeiten` : "Neuer Trupp";
+  f.nr.value = t ? t.nr : Math.max(0, ...e.trupps.map(x => x.nr)) + 1;
+  f.name.value = t ? truppLabel(t) : "";
+  f.auftrag.value = t ? (t.auftrag || "") : "";
+  f.funk.value = t ? (t.funk || "") : "";
+  f.start.value = t ? secToHMS(t.start) : "";
+  f.rueckweg.value = t ? secToHMS(t.rueckweg) : "";
+  f.ende.value = t ? secToHMS(t.ende) : "";
+  $("#dlgTrupp").classList.toggle("with-ende", !!f.ende.value);
+  renderNotesLog($("#dlgTrupp"), t);
+  const pl = $("#personList"); pl.innerHTML = "";
+  const personen = (t && t.personen.length) ? t.personen : Array.from({ length: DEFAULT_NUM_PERSONS_TRUPP }, () => ({}));
+  (personen).forEach(p => pl.append(personRow(p)));
+  editMess = t ? messSorted(t).map(m => ({ ...m })) : [];
+  renderMessLog();
+  truppCalcUpdate();
+  $("#btnDelTrupp").classList.toggle("hidden", !t);
+  openDialog($("#dlgTrupp"));
+  if (!t) f.name.focus();
+}
+$("#formTrupp").addEventListener("submit", ev => {
+  const e = current();
+  const f = $("#formTrupp");
+  const stop = (msg, el) => { ev.preventDefault(); if (msg) alert(msg); if (el) el.focus(); };
+  if (e.closedAt) return;
+  const nr = parseInt(f.nr.value, 10);
+  if (e.trupps.some(x => x.nr === nr && x.id !== editTruppId)) return stop(`Die Nummer ${nr} ist bereits vergeben.`);
+  const name = f.name.value.trim();
+  if (!name) return stop("Bitte einen Truppnamen eingeben.", f.name);
+  const dup = e.trupps.find(x => x.id !== editTruppId && truppLabel(x).trim().toLowerCase() === name.toLowerCase());
+  if (dup) return stop(`Der Truppname „${name}“ ist in diesem Einsatz bereits vergeben (Trupp #${dup.nr}).`, f.name);
+  const personen = readPersons(); // Zeilen ohne Namen verwerfen
+  if (!personen.length) return stop("Bitte mindestens einen Personennamen eingeben.", document.querySelector("#personList .pn"));
+  const ohne = personen.find(p => !(p.druck > 0));
+  if (ohne) return stop(`Bitte den Anfangsdruck für „${ohne.name}“ eingeben.`, document.querySelector(`#personList [data-pid="${ohne.pid}"] .dr`));
+  const odd = personen.filter(p => !druckOk(p));
+  if (odd.length && !confirm("Ungewöhnlicher Anfangsdruck:\n\n" +
+    odd.map(p => `  ${p.name}: ${p.druck} bar (${flasche(p).txt} – erwartet ${flasche(p).min}–${flasche(p).max} bar)`).join("\n") +
+    "\n\nTrotzdem speichern?")) return stop();
+  const old = editTruppId ? e.trupps.find(x => x.id === editTruppId) : null;
+  const start = hmsToSec(f.start.value, (old && old.start) || nowSec());
+  const rueckweg = hmsToSec(f.rueckweg.value, start || nowSec());
+  const ende = hmsToSec(f.ende.value, start || nowSec());
+  if ((rueckweg || ende) && !start) return stop("Rückweg/Endzeit ohne Startzeit ist nicht möglich.", f.start);
+  if (ende && ende < start) return stop("Die Endzeit liegt vor der Startzeit.", f.ende);
+  const edErr = ende && enddruckFehler(personen);
+  if (edErr) return stop(edErr.msg, document.querySelector(`#personList [data-pid="${edErr.p.pid}"] .ed`));
+  if (!ende) personen.forEach(p => { p.enddruck = null; });
+  const data = {
+    nr, name, personen, auftrag: f.auftrag.value.trim(), funk: f.funk.value.trim(),
+    start, rueckweg, ende, messungen: editMess, notizen: addNote(old && old.notizen, f.notiz.value)
+  };
+  if (old) Object.assign(old, data);
+  else { e.trupps.push({ id: uid(), ...data }); toast(`${name} angelegt`); }
+  touch(e); save(); render();
+});
+
+// --- Start ---
+function showStart(t) {
+  const e = current();
+  if (critIdx(t) < 0) { alert("Für diesen Trupp ist kein Anfangsdruck erfasst."); showTruppDialog(t); return; }
+  actionTruppId = t.id;
+  const f = $("#formStart");
+  $("#dlgStartTitle").textContent = `Start: ${truppLabel(t)} (#${t.nr})`;
+  f.start.value = nowHMS();
+  f.auftrag.value = t.auftrag || "";
+  f.funk.value = t.funk || "";
+  const d = startDauer(e, t), p = t.personen[critIdx(t)];
+  $("#startCalc").innerHTML = `
+    <div>${personsHtml(t, " · ")}</div>
+    <div>Maßgeblich: <b>${esc(p.name)}</b> (${nutzbar(p, p.druck)} l nutzbar, ohne ${RESERVE_BAR} bar Reserve) → erwartete Einsatzzeit <b>${fmtMin(d)}</b></div>
+    <div>1. Kontrolle nach <b>${fmtMin(d / 3)}</b> · ½ Einsatzzeit – Rückweg nach <b>${fmtMin(d / 2)}</b> · 2. Kontrolle nach <b>${fmtMin(d * 2 / 3)}</b></div>`;
+  renderNotesLog($("#dlgStart"), t);
+  openDialog($("#dlgStart"));
+}
+$("#formStart").addEventListener("submit", () => {
+  const e = current();
+  if (e.closedAt) return;
+  const t = truppById(actionTruppId), f = $("#formStart");
+  Object.assign(t, { start: hmsToSec(f.start.value), auftrag: f.auftrag.value.trim(), funk: f.funk.value.trim(), notizen: addNote(t.notizen, f.notiz.value) });
+  touch(e); save(); render(); toast(`${truppLabel(t)} gestartet${t.auftrag ? " → " + t.auftrag : ""}`);
+});
+
+// --- Druckablesung ---
+function showDruck(t) {
+  const e = current();
+  if (!plan(e, t)) { alert("Für diesen Trupp ist kein Anfangsdruck erfasst."); showTruppDialog(t); return; }
+  actionTruppId = t.id;
+  const f = $("#formDruck");
+  $("#dlgDruckTitle").textContent = `Druckablesung: ${truppLabel(t)} (#${t.nr})`;
+  f.typ.value = !hasMess(t, 1) ? "1" : !hasMess(t, 2) ? "2" : "0";
+  f.at.value = nowHMS();
+  f.bar.value = "";
+  f.bar.max = lastBar(t, Number(f.typ.value));
+  renderNotesLog($("#dlgDruck"), t);
+  druckPreview();
+  openDialog($("#dlgDruck"));
+  f.bar.focus();
+}
+// letzter bekannter niedrigster Druck im Trupp (letzte Ablesung, sonst niedrigster Anfangsdruck);
+// eine Ablesung, die gerade ersetzt wird (gleiche Art), zählt nicht
+function lastBar(t, ohneTyp) {
+  const m = messSorted(t).filter(x => !ohneTyp || x.typ !== ohneTyp).pop();
+  return m ? m.bar : Math.min(...t.personen.filter(p => p.druck > 0).map(p => p.druck));
+}
+function druckPreview() {
+  const e = current(), t = truppById(actionTruppId), f = $("#formDruck");
+  const old = plan(e, t);
+  const bar = parseInt(f.bar.value, 10);
+  if (!(bar >= 0) || !f.at.value) { $("#druckCalc").innerHTML = `<div>Bisher erwartete Einsatzzeit: <b>${fmtMin(old.total)}</b> · Druck jetzt rechnerisch ≈ <b>${Math.round(estBar(old, nowSec()))} bar</b></div>`; return; }
+  const at = hmsToSec(f.at.value);
+  const p = plan(e, t, { at, bar });
+  const now = nowSec(), prev = lastBar(t, Number(f.typ.value));
+  f.bar.max = prev;
+  if (bar > prev) { $("#druckCalc").innerHTML = `<div class="warnbox">⚠ Der Druck kann nicht höher sein als zuletzt (${prev} bar) – Tippfehler?</div>`; return; }
+  let html = `<div>Neue erwartete Einsatzzeit: <b>${fmtMin(p.total)}</b> (bisher ${fmtMin(old.total)})</div>
+    <div>½ Einsatzzeit – Rückweg um <b>${fmtClock(rwFaellig(t, p))}</b> · Reserve ab ca. <b>${fmtClock(p.endAt)}</b> · Restzeit <b>${fmtMin(Math.max(0, p.endAt - now), true)}</b></div>`;
+  if (p.ist) html += `<div>Ist-Verbrauch ≈ <b>${Math.round(p.ist)} l/min</b> (angenommen ${verbrauch(e)} l/min)</div>`;
+  if (p.ist && p.ist > verbrauch(e) * 1.2) html += `<div class="hintbox">⚠ Verbrauch deutlich höher als angenommen</div>`;
+  if (bar <= RESERVE_BAR) html += `<div class="warnbox">⚠ Reserve (${RESERVE_BAR} bar) erreicht – sofort zurück!</div>`;
+  else if (!t.rueckweg && rwFaellig(t, p) <= now) html += `<div class="warnbox">⚠ ½ Einsatzzeit – Rückweg bereits erreicht!</div>`;
+  $("#druckCalc").innerHTML = html;
+}
+$("#formDruck").addEventListener("input", druckPreview);
+$("#formDruck").addEventListener("change", druckPreview);
+$("#formDruck").addEventListener("submit", ev => {
+  const e = current();
+  if (e.closedAt) return;
+  const t = truppById(actionTruppId), f = $("#formDruck");
+  const at = hmsToSec(f.at.value), bar = parseInt(f.bar.value, 10), typ = Number(f.typ.value);
+  if (at < t.start) { ev.preventDefault(); alert("Die Ablesung liegt vor der Startzeit."); return; }
+  // Druck kann nur sinken → höherer Wert ist ein Tippfehler
+  const prev = lastBar(t, typ);
+  if (bar > prev) { ev.preventDefault(); alert(`Der Druck kann nicht höher sein als zuletzt (${prev} bar).\nBitte Eingabe prüfen.`); f.bar.focus(); return; }
+  if (typ && hasMess(t, typ)) {
+    if (!confirm(`Die ${MESS_TXT[typ]} wurde bereits erfasst.\n\nOK = ersetzen`)) { ev.preventDefault(); return; }
+    t.messungen = t.messungen.filter(m => m.typ !== typ);
+  }
+  t.messungen.push({ at, bar, typ });
+  t.notizen = addNote(t.notizen, f.notiz.value);
+  touch(e); save(); render();
+  toast(`${truppLabel(t)}: ${bar} bar – erwartete Einsatzzeit jetzt ${fmtMin(plan(e, t).total)}`);
+});
+
+// --- ½ Einsatzzeit – Rückweg: Alarm verschieben (erst wenn fällig) oder Rückweg angetreten ---
+function showRw(t) {
+  actionTruppId = t.id;
+  const p = plan(current(), t), now = nowSec();
+  const at = p ? rwFaellig(t, p) : null, due = at != null && now >= at;
+  $("#dlgRwTitle").textContent = `½ Einsatzzeit – Rückweg: ${truppLabel(t)} (#${t.nr})`;
+  $("#rwInfo").innerHTML = at == null ? "<div>Keine Berechnung möglich (kein Anfangsdruck).</div>"
+    : `<div>½ Einsatzzeit – Rückweg ${due ? "erreicht seit" : "um"} <b>${fmtClock(at)}</b>${due ? ` (vor ${fmtMin(now - at)})` : ` (in ${fmtIn(at - now)})`}` +
+      `${t.rwBis > p.rwAt ? ` · berechnet ${fmtClock(p.rwAt)}, verschoben` : ""}</div>` +
+      (due ? "" : `<div class="sub">Verschieben ist erst möglich, wenn die Zeit erreicht ist.</div>`);
+  $("#rwDelayBox").classList.toggle("hidden", !due);
+  openDialog($("#dlgRw"));
+}
+$("#dlgRw").addEventListener("click", ev => {
+  const e = current(), t = truppById(actionTruppId);
+  if (!e || e.closedAt || !t) return;
+  const b = ev.target.closest("[data-rwdelay]");
+  if (b) {
+    const min = Number(b.dataset.rwdelay);
+    t.rwBis = nowSec() + min * 60;
+    t.notizen = addNote(t.notizen, `½ Einsatzzeit – Rückweg: Alarm um ${min} min verschoben`);
+    touch(e); save(); $("#dlgRw").close(); render();
+    toast(`${truppLabel(t)}: Alarm bis ${fmtClock(t.rwBis)} verschoben`);
+  }
+  if (ev.target.closest("#btnRwAngetreten")) {
+    t.rueckweg = nowSec();
+    touch(e); save(); $("#dlgRw").close(); render();
+    toast(`${truppLabel(t)}: Rückweg angetreten`);
+  }
+});
+
+// --- Ende ---
+function showEnde(t) {
+  actionTruppId = t.id;
+  $("#dlgEndeTitle").textContent = `Ende: ${truppLabel(t)} (#${t.nr})`;
+  $("#formEnde").ende.value = nowHMS();
+  $("#endList").innerHTML = t.personen.filter(p => p.name).map(p => `<label class="end-row">
+      <span class="who"><b>${esc(p.name)}</b><span class="sub">Anfang ${p.druck || "?"} bar · ${flasche(p).txt}</span></span>
+      <input type="number" min="0" max="${p.druck || 350}" step="1" inputmode="numeric" placeholder="bar" data-endpid="${p.pid}" aria-label="Enddruck ${esc(p.name)} (bar)" value="${p.enddruck ?? ""}">
+    </label>`).join("");
+  endCheck();
+  renderNotesLog($("#dlgEnde"), t);
+  openDialog($("#dlgEnde"));
+  const first = $("#endList input");
+  if (first) first.focus();
+}
+const endPersons = t => t.personen.filter(p => p.name).map(p => ({ ...p, enddruck: barVal($(`#endList [data-endpid="${p.pid}"]`).value) }));
+// Enddruck markieren: höher als Anfang = Tippfehler, unter Reserve = Hinweis
+function endCheck() {
+  const t = truppById(actionTruppId);
+  const ps = endPersons(t), low = [];
+  let bad = false;
+  ps.forEach(p => {
+    const inp = $(`#endList [data-endpid="${p.pid}"]`), hi = p.enddruck != null && p.druck && p.enddruck > p.druck;
+    inp.classList.toggle("warn-input", hi || (p.enddruck != null && p.enddruck < RESERVE_BAR));
+    if (hi) bad = true;
+    else if (p.enddruck != null && p.enddruck < RESERVE_BAR) low.push(p);
+  });
+  $("#endCalc").innerHTML = (bad ? `<div class="warnbox">⚠ Enddruck kann nicht höher sein als der Anfangsdruck – Tippfehler?</div>` : "") +
+    (low.length ? `<div class="hintbox">⚠ Unter der Reserve (${RESERVE_BAR} bar): ${low.map(p => `${esc(p.name)} ${p.enddruck} bar`).join(", ")}</div>` : "");
+}
+$("#formEnde").addEventListener("input", endCheck);
+$("#formEnde").addEventListener("submit", ev => {
+  const e = current();
+  if (e.closedAt) return;
+  const t = truppById(actionTruppId), f = $("#formEnde");
+  const ende = hmsToSec(f.ende.value, t.start);
+  if (ende < t.start) { ev.preventDefault(); alert("Die Endzeit liegt vor der Startzeit."); return; }
+  const ps = endPersons(t), err = enddruckFehler(ps);
+  if (err) { ev.preventDefault(); alert(err.msg); $(`#endList [data-endpid="${err.p.pid}"]`).focus(); return; }
+  ps.forEach(p => { t.personen.find(x => x.pid === p.pid).enddruck = p.enddruck; });
+  t.ende = ende;
+  t.notizen = addNote(t.notizen, f.notiz.value);
+  touch(e); save(); render(); toast(`${truppLabel(t)} beendet (${fmtMin(t.ende - t.start)})`);
+});
+
+/* ================= Export / Import ================= */
+function download(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const safeName = s => String(s).replace(/[^\wäöüÄÖÜß\-]+/g, "_").slice(0, 60);
+function exportEinsaetze(list, name) {
+  const now = new Date().toISOString();
+  list.forEach(e => { e.exportedAt = now; });
+  download({ app: APP, version: 1, exportiert: now, einsaetze: list }, name);
+  save(); render();
+}
+const exportOne = e => exportEinsaetze([e], `AS-Ueberwachung_${e.datum}_${safeName(e.bezeichnung)}.json`);
+const exportAll = () => exportEinsaetze(state.einsaetze, `AS-Ueberwachung_alle_${todayISO()}.json`);
+
+/* ================= Löschen mit Export-Nachfrage ================= */
+let deleteHandler = null;
+function askDelete({ title, html, onExport, onDelete }) {
+  $("#dlgDeleteTitle").textContent = title;
+  $("#dlgDeleteText").innerHTML = html;
+  deleteHandler = { onExport, onDelete };
+  openDialog($("#dlgDelete"));
+}
+$("#btnDelExport").addEventListener("click", () => {
+  deleteHandler.onExport();
+  // Download kurz anlaufen lassen, bevor gelöscht wird
+  setTimeout(() => { deleteHandler.onDelete(); $("#dlgDelete").close(); }, 300);
+});
+$("#btnDelNoExport").addEventListener("click", () => {
+  if (!confirm("Wirklich OHNE Export löschen? Die Daten sind danach unwiderruflich weg.")) return;
+  deleteHandler.onDelete(); $("#dlgDelete").close();
+});
+
+function deleteEinsatz(x) {
+  const stale = !x.exportedAt || (x.modifiedAt && x.modifiedAt > x.exportedAt);
+  askDelete({
+    title: `Einsatz löschen: ${x.bezeichnung}`,
+    html: `<p>Der Einsatz „<b>${esc(x.bezeichnung)}</b>“ vom ${fmtDate(x.datum)} mit ${x.trupps.length} Trupps wird gelöscht.</p>
+      <p><b>Wurde der Einsatz exportiert?</b></p>
+      ${stale
+        ? `<div class="warnbox">${x.exportedAt ? `Zuletzt exportiert ${fmtStamp(x.exportedAt)} – seither wurde der Einsatz geändert.` : "Dieser Einsatz wurde noch nie exportiert."}</div>`
+        : `<p>Zuletzt exportiert ${fmtStamp(x.exportedAt)}, seither unverändert.</p>`}`,
+    onExport: () => exportOne(x),
+    onDelete: () => {
+      state.einsaetze = state.einsaetze.filter(y => y.id !== x.id);
+      if (state.activeId === x.id) { state.activeId = null; view = "list"; }
+      $("#dlgEinsatz").close();
+      save(); render(); toast("Einsatz gelöscht");
+    }
+  });
+}
+
+function clearStorage() {
+  const n = state.einsaetze.length;
+  askDelete({
+    title: "Lokalen Speicher vollständig leeren",
+    html: `<div class="warnbox">Alle ${n} Einsätze dieser Seite werden aus dem LocalStorage gelöscht!</div>
+      <p><b>Wurden alle Einsätze exportiert?</b></p>`,
+    onExport: () => { if (n) exportAll(); },
+    onDelete: () => {
+      try {
+        // nur die Schlüssel dieser Anwendung – bei file:// teilen sich ggf. mehrere lokale Seiten einen Speicher
+        Object.keys(localStorage).filter(k => k.startsWith("as-ueberwachung")).forEach(k => localStorage.removeItem(k));
+      } catch (e) { console.error(e); }
+      state = { einsaetze: [], activeId: null };
+      view = "list"; render(); toast("Lokaler Speicher geleert");
+    }
+  });
+}
+
+function closeEinsatz(e) {
+  const offen = e.trupps.filter(t => status(t) === "einsatz");
+  let msg = `Einsatz „${e.bezeichnung}“ abschließen?\n\nDanach sind KEINE Änderungen mehr möglich.`;
+  if (offen.length) msg += `\n\nACHTUNG: ${offen.length} Trupp(s) noch im Einsatz:\n` +
+    offen.map(t => `  #${t.nr} ${truppLabel(t)}`).join("\n");
+  if (!confirm(msg)) return;
+  e.closedAt = new Date().toISOString(); touch(e);
+  save(); render(); toast("Einsatz abgeschlossen");
+}
+function validEinsatz(e) {
+  return e && typeof e === "object" && e.bezeichnung && Array.isArray(e.trupps);
+}
+$("#fileImport").addEventListener("change", async ev => {
+  const file = ev.target.files[0]; ev.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.app && data.app !== APP) throw new Error(`Die Datei stammt aus „${data.app}“, nicht aus der AS-Überwachung`);
+    const list = Array.isArray(data.einsaetze) ? data.einsaetze : (validEinsatz(data) ? [data] : null);
+    if (!list || !list.every(validEinsatz)) throw new Error("Unbekanntes Format");
+    let n = 0;
+    for (const imp of list) {
+      imp.trupps.forEach(t => { t.id = t.id || uid(); });
+      migrate(imp);
+      const idx = state.einsaetze.findIndex(e => e.id && e.id === imp.id);
+      if (idx >= 0) {
+        if (confirm(`Einsatz „${imp.bezeichnung}“ (${fmtDate(imp.datum)}) existiert bereits.\n\nOK = überschreiben\nAbbrechen = als Kopie importieren`)) {
+          state.einsaetze[idx] = imp;
+        } else {
+          state.einsaetze.push({ ...imp, id: uid(), bezeichnung: imp.bezeichnung + " (Kopie)" });
+        }
+      } else {
+        state.einsaetze.push({ ...imp, id: imp.id || uid() });
+      }
+      n++;
+    }
+    save(); render(); toast(`${n} Einsatz/Einsätze importiert`);
+  } catch (e) {
+    alert("Import fehlgeschlagen: " + e.message);
+  }
+});
+
+/* ================= Aktionen ================= */
+document.addEventListener("click", ev => {
+  const chip = ev.target.closest("[data-filter]");
+  if (chip) { filter = chip.dataset.filter; render(); return; }
+
+  const el = ev.target.closest("[data-action]");
+  if (!el || el.closest("dialog") && !["delete-trupp", "delete-einsatz"].includes(el.dataset.action)) return;
+  const e = current();
+  const t = e && el.dataset.id ? e.trupps.find(x => x.id === el.dataset.id) : null;
+  // abgeschlossener Einsatz: alle ändernden Aktionen sperren
+  const MUTATING = ["edit-einsatz", "close-einsatz", "new-trupp", "edit-trupp", "delete-trupp", "start", "druck", "rueckweg", "ende"];
+  if (e && e.closedAt && MUTATING.includes(el.dataset.action)) return;
+
+  switch (el.dataset.action) {
+    case "view-list": view = "list"; render(); break;
+    case "view-einsatz": view = "einsatz"; render(); break;
+    case "view-display": view = "display"; render(); break;
+    case "toggle-sound":
+      soundOn = !soundOn;
+      try { localStorage.setItem(SOUND_KEY, soundOn ? "ein" : "aus"); } catch (err) { console.error(err); }
+      if (soundOn) beep();
+      render(); toast(soundOn ? "Warnton ein" : "Warnton aus");
+      break;
+    case "new-einsatz": showEinsatzDialog(null); break;
+    case "edit-einsatz": showEinsatzDialog(e); break;
+    case "open-einsatz": state.activeId = el.dataset.id; save(); view = "display"; filter = "alle"; render(); break;
+    case "delete-einsatz": {
+      const x = state.einsaetze.find(y => y.id === (el.dataset.id || editEinsatzId));
+      if (x) deleteEinsatz(x);
+      break;
+    }
+    case "close-einsatz": closeEinsatz(e); break;
+    case "clear-storage": clearStorage(); break;
+    case "new-trupp": showTruppDialog(null); break;
+    case "edit-trupp": if (t) showTruppDialog(t); break;
+    case "delete-trupp": {
+      const x = e.trupps.find(y => y.id === editTruppId);
+      if (x && confirm(`${truppLabel(x)} (#${x.nr}) wirklich löschen?`)) {
+        e.trupps = e.trupps.filter(y => y.id !== x.id);
+        touch(e); $("#dlgTrupp").close(); save(); render();
+      }
+      break;
+    }
+    case "start": if (t) showStart(t); break;
+    case "druck": if (t) showDruck(t); break;
+    case "rueckweg": if (t) showRw(t); break;
+    case "ende": if (t) showEnde(t); break;
+    case "export-current": exportOne(e); break;
+    case "export-one": exportOne(state.einsaetze.find(y => y.id === el.dataset.id)); break;
+    case "export-all":
+      if (!state.einsaetze.length) { toast("Keine Einsätze vorhanden"); break; }
+      exportAll(); break;
+    case "import": $("#fileImport").click(); break;
+    case "print": window.print(); break;
+    case "haftung": openDialog($("#dlgHaftung")); break;
+  }
+});
+
+/* ================= Start ================= */
+load();
+if (current()) view = "display";
+render();
+tick();
+setInterval(tick, 1000);
+openDialog($("#dlgHaftung")); // Haftungsausschluss bei jedem Start anzeigen
+</script>
+</body>
+</html>
