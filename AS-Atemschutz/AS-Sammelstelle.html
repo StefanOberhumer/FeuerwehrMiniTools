@@ -632,10 +632,9 @@ const STATUS_TXT = { wartend: "Wartend", einsatz: "Im Einsatz", zurueck: "Zurüc
 const truppLabel = t => t.name ? t.name : "Trupp " + t.nr;
 const personNames = t => (t.personen || []).map(p => p.name).filter(Boolean);
 const feuerwehren = t => [...new Set((t.personen || []).map(p => (p.fw || "").trim()).filter(Boolean))];
-// Warteschlange: wartende Trupps nach Anmeldezeit, dann Nummer
+// Warteschlange: wartende Trupps nach laufender Nummer (nicht nach Anmeldezeit, die über Mitternacht nicht sortierbar ist)
 function queue(e) {
-  return e.trupps.filter(t => status(t) === "wartend")
-    .sort((a, b) => (hmToMin(a.anmeldung) ?? 0) - (hmToMin(b.anmeldung) ?? 0) || a.nr - b.nr);
+  return e.trupps.filter(t => status(t) === "wartend").sort((a, b) => a.nr - b.nr);
 }
 // Dauer-Anzeige; bei Überschreitung mit Warnsymbol
 function durHtml(e, min) {
