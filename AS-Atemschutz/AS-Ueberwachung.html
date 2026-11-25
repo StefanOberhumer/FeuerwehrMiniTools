@@ -348,6 +348,32 @@ input.readonly { background: var(--surface-2); color: var(--muted); border-style
 </style>
 </head>
 <body>
+<script>
+"use strict";
+
+
+/* ================= Konstanten ================= */
+const STORAGE_KEY = "as-ueberwachung-v1";
+const SOUND_KEY = "as-ueberwachung-ton"; // Value im LokalStorage für Warnungston
+const APP = "AS-Ueberwachung";
+const DEFAULT_VERBRAUCH = 50;   // Liter pro Minute
+const VORWARNUNG = 60;          // Sekunden vor Kontrolle/½ Einsatzzeit/Reserve gelb vorwarnen
+const BEEP_WIEDERHOLUNG = 20;   // Sekunden: Warnton wiederholen, solange ein Alarm ansteht
+// Flaschentypen: Volumen [l], Nenndruck [bar], plausibler Anfangsdruck ab [bar]
+const FLASCHEN = {
+  "6":   { l: 6,  max: 300, min: 270, txt: "6 l" },
+  "4":   { l: 4,  max: 200, min: 180, txt: "4 l" },
+  "2x6": { l: 12, max: 300, min: 270, txt: "2×6 l" }
+};
+const DEFAULT_FLASCHE = "6";
+// letzte Reserve: fließt nicht in die Berechnung der Einsatzzeit ein
+const RESERVE_BAR = 50;
+const MESS_TXT = { 1: "1. Kontrolle", 2: "2. Kontrolle", 0: "Ablesung" };
+const DEFAULT_NUM_PERSONS_TRUPP = 2; // Standard Personenanzahl pro Trupp
+const DEFAULT_SUGGEST_FW = []; // Standard-Feuerwehr-Vorschlagswerte
+//const DEFAULT_SUGGEST_FW = ['FF Aching','FF Braunau','FF Haselbach','FF Ranshofen']; // Abschnitt-Braunau
+
+</script>
 
 <header>
   <h1>🧯 AS-Überwachung</h1>
@@ -678,27 +704,6 @@ input.readonly { background: var(--surface-2); color: var(--muted); border-style
 
 <script>
 "use strict";
-
-/* ================= Konstanten ================= */
-const STORAGE_KEY = "as-ueberwachung-v1";
-const SOUND_KEY = "as-ueberwachung-ton";
-const APP = "AS-Ueberwachung";
-const DEFAULT_VERBRAUCH = 50;   // Liter pro Minute
-const VORWARNUNG = 60;          // Sekunden vor Kontrolle/½ Einsatzzeit/Reserve gelb vorwarnen
-const BEEP_WIEDERHOLUNG = 20;   // Sekunden: Warnton wiederholen, solange ein Alarm ansteht
-// Flaschentypen: Volumen [l], Nenndruck [bar], plausibler Anfangsdruck ab [bar]
-const FLASCHEN = {
-  "6":   { l: 6,  max: 300, min: 270, txt: "6 l" },
-  "4":   { l: 4,  max: 200, min: 180, txt: "4 l" },
-  "2x6": { l: 12, max: 300, min: 270, txt: "2×6 l" }
-};
-const DEFAULT_FLASCHE = "6";
-// letzte Reserve: fließt nicht in die Berechnung der Einsatzzeit ein
-const RESERVE_BAR = 50;
-const MESS_TXT = { 1: "1. Kontrolle", 2: "2. Kontrolle", 0: "Ablesung" };
-const DEFAULT_NUM_PERSONS_TRUPP = 2; // Standard Personenanzahl pro Trupp
-const DEFAULT_SUGGEST_FW = []; // Standard-Feuerwehr-Vorschlagswerte
-//const DEFAULT_SUGGEST_FW = ['FF Aching','FF Braunau','FF Haselbach','FF Ranshofen']; // Abschnitt-Braunau
 
 /* ================= Speicher ================= */
 let state = { einsaetze: [], activeId: null };
