@@ -282,6 +282,7 @@ const STORAGE_KEY = "as-sammelstelle-v1";
 const DEFAULT_WARN_MIN = 45;
 const DEFAULT_NUM_PERSONS_TRUPP = 3; // Standard Personenanzahl pro Trupp
 const DEFAULT_SUGGEST_FW = []; // Standard-Feuerwehr-Vorschlagswerte
+const DEFAULT_VIEW = "display"; // Ansicht nach Anlegen/Öffnen eines Einsatzes: "display" (Übersicht) oder "einsatz" (Tabelle)
 //const DEFAULT_SUGGEST_FW = ['FF Aching','FF Braunau','FF Haselbach','FF Ranshofen']; // Abschnitt-Braunau
 
 </script>
@@ -945,7 +946,7 @@ $("#formEinsatz").addEventListener("submit", () => {
     const e = { id: uid(), ...data, trupps: [], modifiedAt: new Date().toISOString() };
     state.einsaetze.push(e);
     state.activeId = e.id;
-    view = "einsatz";
+    view = DEFAULT_VIEW;
   }
   save(); render();
 });
@@ -1213,7 +1214,7 @@ document.addEventListener("click", ev => {
     case "view-display": view = "display"; render(); break;
     case "new-einsatz": showEinsatzDialog(null); break;
     case "edit-einsatz": showEinsatzDialog(e); break;
-    case "open-einsatz": state.activeId = el.dataset.id; save(); view = "display"; filter = "alle"; render(); break;
+    case "open-einsatz": state.activeId = el.dataset.id; save(); view = DEFAULT_VIEW; filter = "alle"; render(); break;
     case "delete-einsatz": {
       const x = state.einsaetze.find(y => y.id === (el.dataset.id || editEinsatzId));
       if (x) deleteEinsatz(x);
@@ -1247,7 +1248,7 @@ document.addEventListener("click", ev => {
 
 /* ================= Start ================= */
 load();
-if (current()) view = "display";
+if (current()) view = DEFAULT_VIEW;
 render();
 tick();
 setInterval(tick, 1000);
